@@ -128,7 +128,7 @@ button { font-family: inherit; }
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
-  top: 36px; /* Below safety banner */
+  top: 0;
   z-index: 55;
   box-shadow: var(--shadow-sm);
 }
@@ -246,7 +246,7 @@ button { font-family: inherit; }
    ============================================================ */
 .layout {
   display: flex;
-  min-height: calc(100vh - 100px);
+  min-height: calc(100dvh - 64px);
 }
 .sidebar {
   width: 260px;
@@ -259,8 +259,8 @@ button { font-family: inherit; }
   gap: 8px;
   overflow-y: auto;
   position: sticky;
-  top: 96px;
-  height: calc(100vh - 96px);
+  top: 64px;
+  height: calc(100dvh - 64px);
 }
 .nav-group {
   font-size: 0.72rem;
@@ -339,11 +339,11 @@ main.main-content {
   .menu-btn { display: grid; }
   .sidebar {
     position: fixed;
-    top: 96px;
+    top: 64px;
     left: 0;
     z-index: 80;
     width: 250px;
-    height: calc(100vh - 96px);
+    height: calc(100dvh - 64px);
     transform: translateX(-100%);
     transition: transform var(--speed);
     box-shadow: var(--shadow-lg);
@@ -545,7 +545,7 @@ main.main-content {
   top: 0;
   right: 0;
   width: min(460px, 92vw);
-  height: 100vh;
+  height: 100dvh;
   background: var(--surface);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
@@ -732,11 +732,6 @@ main.main-content {
 </head>
 <body>
 
-<!-- SAFETY BANNER -->
-<div class="safety-banner">
-  <svg data-lucide="shield-alert"></svg>
-  <span><strong>Information Support Only.</strong> Does not replace local policy, MAR charts, GP/prescriber orders, pharmacist advice, NICE guidance, or emergency protocols. In emergency call <strong>999</strong>.</span>
-</div>
 
 <!-- APP BAR -->
 <header class="app-bar">
@@ -5239,6 +5234,8 @@ const Chat = {
 
     performScroll();
     setTimeout(performScroll, 50);
+    setTimeout(performScroll, 150);
+    setTimeout(performScroll, 300);
 
     if (window.lucide) lucide.createIcons();
   },
