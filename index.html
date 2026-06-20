@@ -575,6 +575,7 @@ main.main-content {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  position: relative;
 }
 .msg-bubble {
   max-width: 85%;
@@ -5165,7 +5166,7 @@ const Chat = {
     this.renderHistory('drawer');
   },
 
-  renderHistory(target) {
+  renderHistory(target, scrollMode = 'bottom') {
     const container = document.getElementById(target === 'home' ? 'homeChatMessages' : 'drawerChatMessages');
     if (this.history.length === 0) {
       container.innerHTML = `
@@ -5224,10 +5225,21 @@ const Chat = {
       }
     }).join('');
 
-    container.scrollTop = container.scrollHeight;
-    setTimeout(() => {
+    const performScroll = () => {
+      if (scrollMode === 'last-bot') {
+        const botBubbles = container.querySelectorAll('.msg-bubble.bot');
+        const lastBot = botBubbles[botBubbles.length - 1];
+        if (lastBot) {
+          container.scrollTop = lastBot.offsetTop - 12;
+          return;
+        }
+      }
       container.scrollTop = container.scrollHeight;
-    }, 50);
+    };
+
+    performScroll();
+    setTimeout(performScroll, 50);
+
     if (window.lucide) lucide.createIcons();
   },
 
@@ -5324,7 +5336,7 @@ const Chat = {
     } finally {
       this.isProcessing = false;
       this.refreshSuggestions();
-      this.renderHistory(target);
+      this.renderHistory(target, 'last-bot');
     }
   },
 
