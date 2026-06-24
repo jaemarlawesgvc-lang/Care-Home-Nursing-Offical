@@ -21,9 +21,12 @@ module.exports = async function handler(req, res) {
   const models = [
     { name: "gemini-2.5-flash", version: "v1beta" },
     { name: "gemini-2.5-flash-lite", version: "v1beta" },
-    { name: "gemini-2.0-flash", version: "v1" }
+    { name: "gemini-2.0-flash", version: "v1" },
+    { name: "gemini-2.0-flash-lite", version: "v1beta" }
   ];
-  
+
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
   let primaryErrorText = "";
   let primaryStatus = 500;
 
@@ -31,41 +34,23 @@ module.exports = async function handler(req, res) {
     const item = models[i];
     try {
       const url = `https://generativelanguage.googleapis.com/${item.version}/models/${item.name}:generateContent?key=${apiKey}`;
-      const apiResponse = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
-            }
-          ],
-          safetySettings: [
-            {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_NONE"
-            },
-            {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_NONE"
-            },
-            {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_NONE"
-            },
-            {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_NONE"
-            }
-          ]
-        })
+      const body = JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
       });
+
+      let apiResponse = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+
+      // Retry once after a short delay if the model is overloaded
+      if (apiResponse.status === 503 || apiResponse.status === 529) {
+        await sleep(1500);
+        apiResponse = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      }
 
       if (!apiResponse.ok) {
         const errText = await apiResponse.text();
