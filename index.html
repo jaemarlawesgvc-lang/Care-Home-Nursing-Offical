@@ -4912,6 +4912,18 @@ const App = {
       search.value = '';
     }
     this.filterMedicationsList('');
+
+    // Automatically expand/open the visible medication accordions
+    setTimeout(() => {
+      const accordions = document.querySelectorAll('#medicationsList .accordion');
+      accordions.forEach(acc => {
+        if (acc.style.display !== 'none') {
+          acc.open = true;
+        } else {
+          acc.open = false;
+        }
+      });
+    }, 50);
   },
 
   renderMDT() {
@@ -5319,7 +5331,14 @@ const Chat = {
       if (spinner) spinner.remove();
 
       if (!response.ok) {
-        throw new Error("Proxy error");
+        let errorMsg = "AI assistant unavailable — check your connection";
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) {
+            errorMsg = errData.error;
+          }
+        } catch (e) {}
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
@@ -5329,7 +5348,8 @@ const Chat = {
     } catch (err) {
       const spinner = document.getElementById('chatSpinner');
       if (spinner) spinner.remove();
-      this.history.push({ role: 'bot', text: "AI assistant unavailable — check your connection", time, showFull: false });
+      const displayError = err.message || "AI assistant unavailable — check your connection";
+      this.history.push({ role: 'bot', text: displayError, time, showFull: false });
     } finally {
       this.isProcessing = false;
       this.refreshSuggestions();
