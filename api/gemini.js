@@ -19,17 +19,18 @@ module.exports = async function handler(req, res) {
   }
 
   const models = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite"
+    { name: "gemini-2.5-flash", version: "v1beta" },
+    { name: "gemini-2.5-flash-lite", version: "v1beta" },
+    { name: "gemini-2.0-flash", version: "v1" }
   ];
   
   let primaryErrorText = "";
   let primaryStatus = 500;
 
   for (let i = 0; i < models.length; i++) {
-    const model = models[i];
+    const item = models[i];
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/${item.version}/models/${item.name}:generateContent?key=${apiKey}`;
       const apiResponse = await fetch(url, {
         method: 'POST',
         headers: {
