@@ -4623,6 +4623,7 @@ const App = {
   renderConditions() {
     const list = document.getElementById('conditionsList');
     list.innerHTML = CONDITIONS.map(c => {
+      const safeName = c.name.replace(/'/g, "&#39;");
       return `
         <details class="accordion" data-name="${c.name.toLowerCase()}" data-cats="${c.cats.join(',')}">
           <summary>
@@ -4649,10 +4650,10 @@ const App = {
             </div>
 
             <div style="margin-top: 15px; display: flex; gap: 10px;">
-              <button class="btn btn-primary btn-sm" onclick="Chat.prefill('Ask AI about condition', '${c.name}')">
+              <button class="btn btn-primary btn-sm" onclick="Chat.prefill('Ask AI about condition', '${safeName}')">
                 <svg data-lucide="sparkles"></svg> Ask AI about this condition
               </button>
-              <button class="btn btn-secondary btn-sm" onclick="App.filterMedsByCondition('${c.name}')">
+              <button class="btn btn-secondary btn-sm" onclick="App.filterMedsByCondition('${safeName}')">
                 <svg data-lucide="pill"></svg> Medications used for this condition
               </button>
             </div>
