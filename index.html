@@ -5331,11 +5331,19 @@ const Chat = {
       if (spinner) spinner.remove();
 
       if (!response.ok) {
-        let errorMsg = "AI assistant unavailable — check your connection";
+        let errorMsg = `AI assistant error (Status ${response.status})`;
         try {
-          const errData = await response.json();
-          if (errData && errData.error) {
-            errorMsg = errData.error;
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            if (errData && errData.error) {
+              errorMsg = errData.error;
+            }
+          } else {
+            const text = await response.text();
+            if (text && text.trim().length > 0) {
+              errorMsg += `: ${text.trim().substring(0, 100)}`;
+            }
           }
         } catch (e) {}
         throw new Error(errorMsg);
