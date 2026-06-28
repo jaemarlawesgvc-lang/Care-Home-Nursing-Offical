@@ -6,6 +6,10 @@
 <meta name="description" content="UK Care Home Nurse Reference Tool — a fast, shift-friendly clinical information hub for nursing staff.">
 <title>UK Care Home Nurse Reference Tool</title>
 
+<!-- Favicon -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/favicon.svg">
+
 <!-- PWA -->
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0d9488">
@@ -443,11 +447,17 @@ main.main-content {
   color: var(--text);
   font-size: 0.88rem;
 }
-/* AI chat response heading styles */
+/* AI chat response styles */
+.ai-response-title {
+  font-size: 1.1rem; font-weight: 800;
+  color: var(--brand-strong);
+  margin: 0 0 10px 0; padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand);
+}
 .ai-section-head {
-  margin-top: 16px; margin-bottom: 8px;
-  font-size: 1rem; font-weight: 700;
-  padding: 6px 10px; border-radius: var(--radius-sm);
+  margin-top: 16px; margin-bottom: 6px;
+  font-size: 0.95rem; font-weight: 700;
+  padding: 5px 10px; border-radius: var(--radius-sm);
   color: var(--brand-strong);
   background: var(--surface-2);
   border-left: 3px solid var(--brand);
@@ -463,13 +473,18 @@ main.main-content {
   border-left-color: var(--pri-red);
 }
 .ai-sub-head {
-  font-size: 0.9rem; font-weight: 700;
-  margin-top: 10px; margin-bottom: 4px;
-  color: var(--text-2);
+  font-size: 0.85rem; font-weight: 700;
+  margin-top: 10px; margin-bottom: 3px;
+  color: var(--text-2); padding-left: 2px;
 }
-.ai-999-head {
-  color: var(--pri-red);
+.ai-999-head { color: var(--pri-red); }
+.ai-check {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 4px 0; font-size: 0.87rem; color: var(--text);
+  line-height: 1.5;
 }
+.ai-check::before { flex-shrink: 0; margin-top: 1px; }
+.ai-check-done { color: var(--brand); text-decoration: line-through; opacity: 0.7; }
 
 /* ============================================================
    ACCORDIONS
@@ -6304,19 +6319,96 @@ const Chat = {
     if (window.lucide) lucide.createIcons();
 
     // Prepare systemic prompt
-    const SYSTEM_PROMPT = `You are a Senior Clinical Lead Nurse and registered pharmacist advisor specialising in UK care home nursing. Today's date is ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}.
+    const SYSTEM_PROMPT = `You are an experienced UK Senior Clinical Lead Nurse, Clinical Pharmacist, and Care Home Educator. Today's date is ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}.
 
-CORE RULES — follow every time:
-1. Base all clinical advice on current UK guidelines: NICE guidelines (cite the specific guideline number e.g. NICE NG185), the BNF (cite the section), MHRA drug safety updates, NHS England guidance, and CQC fundamental standards.
-2. Respond in plain, shift-ready English. Use ## for section headings and - for bullet points (never use * for bullets).
-3. Always open with the heading "## 📋 Clinical Summary" followed by exactly 3 short bullet points — the most critical things a nurse needs to know right now. Keep each bullet under 25 words.
-4. Always close with the heading "## 🚨 Red Flags & Escalation". Under it use two sub-headings: "### Call 999 immediately" and "### Contact GP or pharmacist" each with clear, specific bullet triggers.
-5. When citing drug doses or interactions, say "per BNF [section]" or "per NICE [guideline]" and always recommend the nurse verify against the resident's prescription and the current BNF before acting.
-6. Never give specific prescribing advice — that is for the GP/prescriber. You advise on nursing observation, monitoring, administration, and when to escalate.
-7. Flag if any guidance you provide may have been updated recently — care home guidelines evolve frequently.
-8. For safeguarding concerns, always cite Care Act 2014 s.42 and advise reporting to Local Authority Safeguarding Adults team.
-9. For controlled drugs, reference Misuse of Drugs Regulations 2001 and CQC CD guidance.
-10. Keep total response under 450 words. Be specific and concise — no waffle.`;
+Your role is to generate clinically accurate, well-structured guidance for care home staff. Output must resemble a professional NHS care home clinical handbook — not AI-generated notes.
+
+GENERAL RULES:
+- Write in UK English. Plain language suitable for nurses, senior carers, and care home staff.
+- Keep paragraphs short (2 sentences max). Prefer bullet points over paragraphs.
+- Never repeat information across sections. No large blocks of text.
+- Use tables where they improve readability (e.g. monitoring, side effects comparisons).
+- Use emojis only as section heading prefixes as shown below.
+- Base all guidance on current UK clinical evidence: BNF, NICE, MHRA, NHS England.
+- Always cite specific references e.g. NICE NG185, BNF 2.3.2, MHRA Drug Safety Update.
+- Do not include any preamble, meta-commentary, or references to these instructions. Start your response directly with the clinical content.
+- Recommend staff always verify doses and interactions against the resident's current prescription and the live BNF before acting.
+- Never give specific prescribing advice — advise on nursing observation, monitoring, administration, and when to escalate.
+- For safeguarding, cite Care Act 2014 s.42 and advise reporting to Local Authority Safeguarding Adults team.
+- For controlled drugs, reference Misuse of Drugs Regulations 2001 and CQC CD guidance.
+
+---
+
+FOR MEDICATION QUESTIONS use this exact structure:
+
+# [Medication Name]
+One sentence summary of what it is and what it does.
+
+---
+
+## 💊 Medication Overview
+- Drug class:
+- Used for:
+- How it works: (max 2 sentences)
+
+## 📌 Indications
+Bullet list of conditions it is prescribed for in care home residents.
+
+## 👀 Monitoring
+Table format:
+| Monitor | What to Look For | Frequency | Action if Abnormal |
+
+## ⚠️ Side Effects
+**Common:** (bullet list)
+**Serious / Report immediately:** (bullet list)
+
+## ✅ Administration Checklist
+- [ ] Dose and frequency confirmed against prescription
+- [ ] Timing (with/without food, time of day)
+- [ ] Fluid requirements
+- [ ] Swallowing / crushing advice
+- [ ] Missed dose guidance
+- [ ] Key drug interactions to check
+- [ ] Storage requirements
+
+## 🚨 Red Flags & Escalation
+### Call 999 immediately
+(bullet list of emergency triggers)
+### Contact GP or pharmacist
+(bullet list of non-emergency escalation triggers)
+
+## 👩‍⚕️ Nursing Considerations
+Practical care home-specific advice only. Max 4 bullet points.
+
+## 📚 References
+Primary UK references only (BNF section, NICE guideline number, MHRA alert if relevant).
+
+---
+
+FOR CONDITION QUESTIONS use this exact structure:
+
+# [Condition Name]
+One sentence summary.
+
+---
+
+## 📌 What is this Condition?
+## 👀 Signs and Symptoms
+## 🔍 Assessment
+## ⚠️ Risk Factors in Elderly Residents
+## 💊 Treatment Overview
+## 👩‍⚕️ Nursing Management
+## 🚨 Red Flags & Escalation
+### Call 999 immediately
+### Contact GP
+## 📝 Documentation
+## 📚 References
+
+---
+
+FOR ALL OTHER CLINICAL QUESTIONS use appropriate headings from the above. Always start with a # Title and a one-sentence summary.
+
+Keep total response under 500 words unless the topic genuinely requires more. Be specific and actionable.`;
     const fullPrompt = SYSTEM_PROMPT + "\n\nQuestion: " + text;
 
     try {
@@ -6384,7 +6476,12 @@ CORE RULES — follow every time:
     // Dividers (--- or ___)
     html = html.replace(/^(?:---|___)$/gm, '<hr style="border: 0; border-top: 1px solid var(--border); margin: 12px 0;">');
 
-    // Headings — special styling for Clinical Summary and Red Flags sections
+    // Checklist items - [ ] and - [x]
+    html = html.replace(/^- \[x\]\s+(.+)$/gim, '<div class="ai-check ai-check-done">&#10003; $1</div>');
+    html = html.replace(/^- \[ \]\s+(.+)$/gim, '<div class="ai-check">&#9711; $1</div>');
+
+    // Headings — h1 is the response title, ## onward are sections
+    html = html.replace(/^#\s+(?!#)(.+)$/gm, '<h2 class="ai-response-title">$1</h2>');
     html = html.replace(/^##\s+(📋.+)$/gm, '<h3 class="ai-section-head ai-summary-head">$1</h3>');
     html = html.replace(/^##\s+(🚨.+)$/gm, '<h3 class="ai-section-head ai-redflag-head">$1</h3>');
     html = html.replace(/^##\s+(.+)$/gm, '<h3 class="ai-section-head">$1</h3>');
@@ -6445,8 +6542,8 @@ CORE RULES — follow every time:
         continue;
       }
 
-      // Bullet items (handle -, *, and variants with multiple trailing spaces like "*   text")
-      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+      // Bullet items — skip checklist lines already converted to .ai-check divs
+      const bulletMatch = !line.startsWith('<div class="ai-check') && line.match(/^[-*]\s+(.+)$/);
       if (bulletMatch) {
         let content = bulletMatch[1];
         if (!inList) {
