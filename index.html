@@ -6720,25 +6720,25 @@ const Tools = {
 };
 
 /* ============================================================
-   GUIDELINE PULSE — weekly auto-check for NICE/BNF updates
+   GUIDELINE PULSE
+   Server (Vercel KV) is the source of truth — cached for 24h
+   and shared across every nurse on every device.
+   Browser localStorage is only used as an offline fallback.
    ============================================================ */
 const GuidelinePulse = {
-  STORAGE_KEY: 'nhub-pulse',
-  CHECKED_KEY: 'nhub-pulse-checked',
-  SEVEN_DAYS: 7 * 24 * 60 * 60 * 1000,
+  OFFLINE_KEY: 'nhub-pulse-offline',
 
   async init() {
-    const lastChecked = localStorage.getItem(this.CHECKED_KEY);
-    const cached = localStorage.getItem(this.STORAGE_KEY);
-    const isStale = !lastChecked || (Date.now() - new Date(lastChecked).getTime() > this.SEVEN_DAYS);
-
-    if (cached && !isStale) {
+    // Show offline cache immediately so the screen isn't blank while fetching
+    const offline = localStorage.getItem(this.OFFLINE_KEY);
+    if (offline) {
       try {
-        this.render(JSON.parse(cached));
-        this.renderTimestamp(lastChecked);
-        return;
-      } catch { /* fall through to refresh */ }
+        const cached = JSON.parse(offline);
+        this.render(cached.updates, cached.checkedAt, true);
+      } catch {}
     }
+    // Always fetch from server — KV returns instantly if fresh, Gemini only
+    // runs when the server-side 24h cache is stale (costs nothing otherwise)
     await this.refresh(false);
   },
 
@@ -6757,23 +6757,28 @@ const GuidelinePulse = {
       const res = await fetch('/api/guidelines-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: '{}'
       });
-      if (!res.ok) throw new Error('API error');
+      if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
-      const checkedAt = data.checkedAt || new Date().toISOString();
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data.updates || []));
-      localStorage.setItem(this.CHECKED_KEY, checkedAt);
-      this.render(data.updates || []);
-      this.renderTimestamp(checkedAt);
-      if (showFeedback) showToast('Guideline Pulse updated');
+
+      // Persist as offline fallback
+      localStorage.setItem(this.OFFLINE_KEY, JSON.stringify(data));
+
+      const wasStale = data.stale === true;
+      this.render(data.updates || [], data.checkedAt, false);
+      if (showFeedback) showToast(wasStale ? 'Showing last known updates (refresh failed)' : 'Guideline Pulse updated');
+
     } catch {
-      // Show cached or fallback
-      const cached = localStorage.getItem(this.STORAGE_KEY);
-      if (cached) {
-        try { this.render(JSON.parse(cached)); }
-        catch { this.renderError(); }
-      } else {
+      // Offline or server error — keep whatever is already displayed
+      const offline = localStorage.getItem(this.OFFLINE_KEY);
+      if (offline && showFeedback) {
+        try {
+          const cached = JSON.parse(offline);
+          this.render(cached.updates, cached.checkedAt, true);
+          showToast('Offline — showing last saved updates');
+        } catch { this.renderError(); }
+      } else if (!offline) {
         this.renderError();
       }
     } finally {
@@ -6782,16 +6787,16 @@ const GuidelinePulse = {
     }
   },
 
-  render(updates) {
+  render(updates, checkedAt, isOffline = false) {
     const grid = document.getElementById('guidelinePulseGrid');
     if (!grid) return;
     if (!updates || updates.length === 0) { this.renderError(); return; }
 
     const catColour = {
-      'NICE Guideline': 'var(--brand)',
-      'Drug Safety': 'var(--pri-red)',
-      'CQC/Regulatory': 'var(--pri-amber)',
-      'NHS Guidance': 'var(--accent)'
+      'NICE Guideline':  'var(--brand)',
+      'Drug Safety':     'var(--pri-red)',
+      'CQC/Regulatory':  'var(--pri-amber)',
+      'NHS Guidance':    'var(--accent)'
     };
     const priColour = { 'High': 'red', 'Medium': 'amber', 'Low': 'blue' };
 
@@ -6804,22 +6809,26 @@ const GuidelinePulse = {
         <span style="font-size:0.72rem; color:var(--text-3); font-weight:600;">${u.source || ''}</span>
       </div>
     `).join('');
+
+    // Timestamp line
+    const el = document.getElementById('pulseCheckedAt');
+    if (el && checkedAt) {
+      const d   = new Date(checkedAt);
+      const fmt = `${d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})} at ${d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
+      el.textContent = isOffline
+        ? `⚠️ Offline — last server update: ${fmt}`
+        : `Last updated: ${fmt} · shared across all devices`;
+    }
+
     if (window.lucide) lucide.createIcons();
   },
 
   renderError() {
     const grid = document.getElementById('guidelinePulseGrid');
     if (grid) grid.innerHTML = `
-      <div style="grid-column: 1/-1; padding: 20px; text-align:center; color:var(--text-3); font-size:0.88rem; border:1px dashed var(--border); border-radius:var(--radius-sm);">
+      <div style="grid-column:1/-1; padding:20px; text-align:center; color:var(--text-3); font-size:0.88rem; border:1px dashed var(--border); border-radius:var(--radius-sm);">
         Unable to fetch guideline updates — check your connection or try refreshing.
       </div>`;
-  },
-
-  renderTimestamp(checkedAt) {
-    const el = document.getElementById('pulseCheckedAt');
-    if (!el || !checkedAt) return;
-    const d = new Date(checkedAt);
-    el.textContent = `Last checked: ${d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})} at ${d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
   }
 };
 
