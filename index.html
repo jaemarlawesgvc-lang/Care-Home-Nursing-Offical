@@ -6132,9 +6132,9 @@ const Chat = {
   prefill(type, name) {
     let prompt = "";
     if (type === 'Ask AI about medication') {
-      prompt = `Act as a Senior Clinical Lead Nurse. Provide a structured, shift-friendly guide for the medication: **${name}**. Detail: what it is prescribed for, key side effects to monitor in the elderly, and critical administration checks. Please use a structured comparison table if helpful.`;
+      prompt = `Provide a complete medication guide for: ${name}`;
     } else if (type === 'Ask AI about condition') {
-      prompt = `Act as a Senior Clinical Lead Nurse. Provide a structured, shift-friendly guide for the condition: **${name}**. Detail: key clinical signs, red flags to escalate immediately, and care-home specific care priorities.`;
+      prompt = `Provide a complete condition guide for: ${name}`;
     }
     
     // Open drawer and fill
