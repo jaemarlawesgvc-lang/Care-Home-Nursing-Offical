@@ -6,9 +6,31 @@
 <meta name="description" content="UK Care Home Nurse Reference Tool — a fast, shift-friendly clinical information hub for nursing staff.">
 <title>UK Care Home Nurse Reference Tool</title>
 
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d9488">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Nurse Hub">
+
 <!-- Google Fonts & Lucide Icons -->
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+
+<script>
+  // Register service worker for offline support
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+  }
+  // Restore theme before paint to prevent flash
+  (function() {
+    const saved = localStorage.getItem('nhub-theme');
+    if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else if (saved === 'light') document.documentElement.removeAttribute('data-theme');
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark');
+  })();
+</script>
 
 <style>
 /* ============================================================
@@ -707,6 +729,237 @@ main.main-content {
 .embed-chat .chat-messages { height: 100%; }
 
 /* ============================================================
+   TOAST NOTIFICATIONS
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  background: var(--text);
+  color: var(--surface);
+  padding: 10px 18px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ============================================================
+   REVIEWED BADGE & CITATIONS
+   ============================================================ */
+.reviewed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--pri-green-bg);
+  color: var(--pri-green);
+  border: 1px solid rgba(22,163,74,0.2);
+  margin-left: 10px;
+  vertical-align: middle;
+}
+.citation-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 16px;
+  align-items: center;
+}
+.citation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(37,99,235,0.15);
+  cursor: default;
+}
+
+/* ============================================================
+   BOOKMARKS
+   ============================================================ */
+.bookmark-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: var(--speed);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.bookmark-btn:hover { background: var(--surface-2); color: var(--brand); border-color: var(--brand); }
+.bookmark-btn.bookmarked { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
+.bookmark-btn svg { width: 14px; height: 14px; }
+
+.nav-tab { position: relative; }
+
+/* Guideline pulse */
+.pulse-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: var(--surface);
+  position: relative;
+}
+.pulse-card .pulse-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.pulse-skeleton {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  height: 80px;
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer {
+  0%,100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* ============================================================
+   COPY BUTTON (inline, for SBAR/templates)
+   ============================================================ */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--speed);
+}
+.copy-btn:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
+.copy-btn svg { width: 13px; height: 13px; }
+
+/* ============================================================
+   INTERACTIVE TOOLS (MUST, Abbey Pain Scale)
+   ============================================================ */
+.tool-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.score-display {
+  text-align: center;
+  padding: 20px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 2px dashed var(--border);
+  margin: 16px 0;
+}
+.score-display .score-number {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--brand);
+}
+.score-display .score-label {
+  font-size: 0.9rem;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+.score-display .score-interpretation {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.tool-input-group {
+  margin-bottom: 16px;
+}
+.tool-input-group label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+.tool-input-group select, .tool-input-group input[type="number"] {
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  background: var(--bg);
+  color: var(--text);
+  transition: var(--speed);
+}
+.tool-input-group select:focus, .tool-input-group input:focus {
+  border-color: var(--brand);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.abbey-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  margin-bottom: 10px;
+}
+.abbey-item label { font-weight: 700; font-size: 0.9rem; }
+.abbey-item .abbey-desc { font-size: 0.8rem; color: var(--text-3); }
+.abbey-item .abbey-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+.abbey-option {
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: var(--speed);
+  color: var(--text-2);
+}
+.abbey-option:hover { border-color: var(--brand); color: var(--brand); }
+.abbey-option.selected { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-strong); }
+
+/* ============================================================
    PRINT AND PRINT-FRIENDLY CSS
    ============================================================ */
 @media print {
@@ -747,7 +1000,7 @@ main.main-content {
   </div>
   <div class="search-container">
     <svg data-lucide="search"></svg>
-    <input type="text" id="globalSearch" placeholder="Quick search library..." autocomplete="off">
+    <input type="text" id="globalSearch" placeholder="Quick search library... (⌘K)" autocomplete="off">
     <div class="search-results" id="searchResults"></div>
   </div>
   <button class="icon-btn" id="themeToggle" title="Toggle dark mode" aria-label="Toggle theme">
@@ -775,6 +1028,13 @@ main.main-content {
     <button class="nav-tab" data-target="mdt"><svg data-lucide="network"></svg>MDT Referral Routing</button>
     <button class="nav-tab" data-target="admin"><svg data-lucide="clipboard-check"></svg>Clinical & Admin Guide</button>
     <button class="nav-tab" data-target="safety"><svg data-lucide="award"></svg>Clinical Safety Recs</button>
+    <div class="nav-group">Clinical Tools</div>
+    <button class="nav-tab" data-target="sskin"><svg data-lucide="layers"></svg>Pressure Care (SSKIN)</button>
+    <button class="nav-tab" data-target="must"><svg data-lucide="scale"></svg>MUST Nutrition Score</button>
+    <button class="nav-tab" data-target="pain"><svg data-lucide="heart-pulse"></svg>Pain Assessment</button>
+    <button class="nav-tab" data-target="cds"><svg data-lucide="lock"></svg>Controlled Drugs</button>
+    <button class="nav-tab" data-target="oral"><svg data-lucide="smile"></svg>Oral Health</button>
+    <button class="nav-tab" data-target="safeguarding"><svg data-lucide="shield"></svg>Safeguarding</button>
     <div class="sidebar-footer">
       Version 2.1.0 (In-Memory)<br>
       UK clinical guidance support.
@@ -831,6 +1091,20 @@ main.main-content {
             <li>Safeguarding: Abuse/neglect concern</li>
           </ul>
         </div>
+      </div>
+
+      <!-- Guideline Pulse -->
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <h2 style="font-size: 1.3rem; margin: 0;"><svg data-lucide="zap" style="vertical-align: middle; margin-right: 6px; color: var(--brand);"></svg>Guideline Pulse <span style="font-size:0.75rem; font-weight:400; color:var(--text-3); margin-left:8px;">Auto-updated from NICE / BNF / CQC via AI</span></h2>
+          <button class="btn btn-secondary btn-sm" id="refreshPulseBtn" onclick="GuidelinePulse.refresh(true)"><svg data-lucide="refresh-cw"></svg> Refresh Now</button>
+        </div>
+        <div id="guidelinePulseGrid" class="grid cols-3">
+          <div class="pulse-skeleton"></div>
+          <div class="pulse-skeleton"></div>
+          <div class="pulse-skeleton"></div>
+        </div>
+        <p id="pulseCheckedAt" style="font-size:0.72rem; color:var(--text-3); margin:6px 0 0; text-align:right;"></p>
       </div>
 
       <!-- Embedded Chat Panel -->
@@ -1067,10 +1341,13 @@ main.main-content {
         
         <div class="grid cols-2" style="gap: 16px;">
           <!-- Scenario A: Sepsis -->
-          <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; background: var(--surface);">
-            <h4 style="color: var(--pri-red); font-size: 0.95rem; margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-              <svg data-lucide="siren" style="width: 16px; height: 16px;"></svg> Suspected Sepsis Escalation (To 999 / GP)
-            </h4>
+          <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; background: var(--surface);" class="sbar-scenario">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;">
+              <h4 style="color: var(--pri-red); font-size: 0.95rem; margin: 0; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <svg data-lucide="siren" style="width: 16px; height: 16px;"></svg> Suspected Sepsis Escalation (To 999 / GP)
+              </h4>
+              <button class="copy-btn" onclick="Tools.copySBAR(this)" title="Copy script"><svg data-lucide="copy"></svg> Copy</button>
+            </div>
             <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-2); display: flex; flex-direction: column; gap: 8px;">
               <p><strong>Situation:</strong> "Hello, my name is Nurse Alex from Oaklands Care Home. I am escalating resident Doris Smith, Room 12, who has a suspected chest infection and presents with red-flag signs of sepsis."</p>
               <p><strong>Background:</strong> "Doris is an 84-year-old with moderate Alzheimer's and chronic kidney disease. She is usually alert, self-mobilising, and independently communicative. She was started on oral Amoxicillin yesterday for a chest infection."</p>
@@ -1080,10 +1357,13 @@ main.main-content {
           </div>
 
           <!-- Scenario B: Post-Fall -->
-          <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; background: var(--surface);">
-            <h4 style="color: var(--pri-amber); font-size: 0.95rem; margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-              <svg data-lucide="alert-octagon" style="width: 16px; height: 16px;"></svg> Post-Fall - Suspected Hip Fracture (To GP / 999)
-            </h4>
+          <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; background: var(--surface);" class="sbar-scenario">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;">
+              <h4 style="color: var(--pri-amber); font-size: 0.95rem; margin: 0; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <svg data-lucide="alert-octagon" style="width: 16px; height: 16px;"></svg> Post-Fall - Suspected Hip Fracture (To GP / 999)
+              </h4>
+              <button class="copy-btn" onclick="Tools.copySBAR(this)" title="Copy script"><svg data-lucide="copy"></svg> Copy</button>
+            </div>
             <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-2); display: flex; flex-direction: column; gap: 8px;">
               <p><strong>Situation:</strong> "Hello, this is Nurse Sarah from Meadowside Home. I am calling to request an urgent visit for Arthur Pendelton, Room 14, who has suffered an unwitnessed fall and has a suspected right hip fracture."</p>
               <p><strong>Background:</strong> "Arthur is a 79-year-old resident with Osteoarthritis and Parkinson's Disease. He uses a Zimmer frame and requires 1 staff guidance for mobility. He is on regular Levodopa and Apixaban (anticoagulant)."</p>
@@ -1093,10 +1373,13 @@ main.main-content {
           </div>
 
           <!-- Scenario C: Acute Delirium / UTI -->
-          <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; background: var(--surface);">
-            <h4 style="color: var(--pri-blue); font-size: 0.95rem; margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-              <svg data-lucide="brain" style="width: 16px; height: 16px;"></svg> Acute Delirium / Suspected UTI (To GP)
-            </h4>
+          <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; background: var(--surface);" class="sbar-scenario">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;">
+              <h4 style="color: var(--pri-blue); font-size: 0.95rem; margin: 0; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <svg data-lucide="brain" style="width: 16px; height: 16px;"></svg> Acute Delirium / Suspected UTI (To GP)
+              </h4>
+              <button class="copy-btn" onclick="Tools.copySBAR(this)" title="Copy script"><svg data-lucide="copy"></svg> Copy</button>
+            </div>
             <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-2); display: flex; flex-direction: column; gap: 8px;">
               <p><strong>Situation:</strong> "Hello, my name is Nurse Alex from Oaklands Home. I am calling to request a GP assessment or advice for resident Harold Finch, Room 9, who has developed acute onset agitation, confusion, and suspected urinary tract infection."</p>
               <p><strong>Background:</strong> "Harold is an 88-year-old with mild cognitive impairment. He is usually pleasant, oriented, and independently mobile. He has a history of recurrent urinary retention."</p>
@@ -1106,10 +1389,13 @@ main.main-content {
           </div>
 
           <!-- Scenario D: Breakthrough Pain -->
-          <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; background: var(--surface);">
-            <h4 style="color: var(--brand); font-size: 0.95rem; margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-              <svg data-lucide="heart" style="width: 16px; height: 16px;"></svg> End of Life Breakthrough Pain (To District Nurse)
-            </h4>
+          <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; background: var(--surface);" class="sbar-scenario">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;">
+              <h4 style="color: var(--brand); font-size: 0.95rem; margin: 0; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <svg data-lucide="heart" style="width: 16px; height: 16px;"></svg> End of Life Breakthrough Pain (To District Nurse)
+              </h4>
+              <button class="copy-btn" onclick="Tools.copySBAR(this)" title="Copy script"><svg data-lucide="copy"></svg> Copy</button>
+            </div>
             <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-2); display: flex; flex-direction: column; gap: 8px;">
               <p><strong>Situation:</strong> "Hello, this is Nurse Maria from Oaklands. I am calling to request an urgent visit or syringe driver advice for resident Beatrice Miller, Room 22, who is in the active phase of dying and experiencing uncontrolled breakthrough pain."</p>
               <p><strong>Background:</strong> "Beatrice is 91 with advanced metastatic breast cancer, receiving palliative comfort care. She has a McKinley T34 syringe driver running containing Morphine 20mg and Midazolam 10mg over 24 hours. She has a signed DNACPR and gold standards framework (GSF) pathway."</p>
@@ -1304,6 +1590,632 @@ main.main-content {
       
       <div class="grid cols-2" id="mdtList">
         <!-- Filled dynamically by JS -->
+      </div>
+    </section>
+
+    <!-- SECTION 13: PRESSURE CARE (SSKIN) -->
+    <section class="section-panel" id="sskin">
+      <h2>Pressure Care: SSKIN Bundle & Wound Staging <span class="reviewed-badge"><svg data-lucide="check-circle" style="width:12px;height:12px;"></svg> Reviewed Jun 2026</span></h2>
+      <div class="citation-bar">
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> NICE NG89 (Pressure Ulcers)</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> EPUAP/NPIAP 2019 Classification</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> NHS England SSKIN Bundle</span>
+      </div>
+
+      <div class="warning-box" style="margin-bottom: 20px;">
+        <strong>🚨 Mandatory Reporting:</strong> Any new Category 2 or above pressure ulcer that was not present on admission must be reported via your incident reporting system and may require a Serious Incident (SI) review under NHS England guidance. Always photograph, measure, and document on a body map at discovery.
+      </div>
+
+      <h3 style="border-bottom: 2px solid var(--brand); padding-bottom: 6px; margin-bottom: 16px;">The SSKIN Bundle — 5 Elements of Prevention</h3>
+      <div class="grid cols-auto" style="margin-bottom: 24px;">
+        <div class="card" style="border-top: 4px solid var(--brand);">
+          <div class="card-header"><svg data-lucide="layers"></svg><h4 class="card-title">S — Surface</h4></div>
+          <p style="font-size:0.88rem;">Ensure the right support surface is in place. Assess whether the current mattress (foam, dynamic, static air) matches the resident's risk level. High-risk residents (Braden ≤12) require a dynamic alternating-pressure mattress. Check mattresses for "bottoming out" — if you can feel the bed frame through the mattress under the resident, it has failed.</p>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--brand);">
+          <div class="card-header"><svg data-lucide="eye"></svg><h4 class="card-title">S — Skin Inspection</h4></div>
+          <p style="font-size:0.88rem;">Inspect all pressure points at every repositioning: sacrum, heels, ischial tuberosities, greater trochanters, elbows, shoulders, occiput, ears, toes. Press on redness — if it blanches (turns white and recovers), it is Category 1 (non-blanchable = at risk or early damage). Document using a body map and wound assessment chart.</p>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--brand);">
+          <div class="card-header"><svg data-lucide="move"></svg><h4 class="card-title">K — Keep Moving</h4></div>
+          <p style="font-size:0.88rem;">Reposition bed-bound residents every 2 hours (minimum). Use the 30° tilt, never 90° lateral as it directly loads the greater trochanter. Chair-bound residents: encourage 15-minute micro-lifts or weight shifts every hour. Heels must be <strong>entirely off</strong> the mattress using foam wedges or heel boots — not just elevated.</p>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--brand);">
+          <div class="card-header"><svg data-lucide="droplets"></svg><h4 class="card-title">I — Incontinence</h4></div>
+          <p style="font-size:0.88rem;">Moisture from urine and faeces is a major risk factor for skin breakdown (moisture-associated skin damage / MASD). Change pads promptly. Apply barrier cream (e.g. Cavilon, zinc oxide) to protect skin. Do not use talcum powder. Consider containment devices for high-risk residents. Document incontinence episodes on the fluid/continence chart.</p>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--brand);">
+          <div class="card-header"><svg data-lucide="utensils"></svg><h4 class="card-title">N — Nutrition & Hydration</h4></div>
+          <p style="font-size:0.88rem;">Poor nutrition directly impairs wound healing and skin resilience. Complete a MUST score on admission and monthly (or after significant change). Refer to dietitian if MUST ≥2. Ensure adequate protein intake — high-protein supplements (e.g. Fortisip) for those at risk. Aim for 1.5–2 litres fluid daily. Document all food intake on a food chart if there are concerns.</p>
+        </div>
+      </div>
+
+      <h3 style="border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 16px;">EPUAP/NPIAP Pressure Ulcer Classification</h3>
+      <div class="grid cols-2">
+        <div class="card" style="border-left: 5px solid var(--pri-amber);">
+          <div class="badge amber" style="margin-bottom: 10px;">Category 1</div>
+          <strong style="display:block; margin-bottom: 6px;">Non-blanchable Erythema of Intact Skin</strong>
+          <p style="font-size:0.85rem; margin:0; color: var(--text-2);">Localised area of redness on intact skin that does not blanch when pressed. May be painful, firm, soft, warmer, or cooler than adjacent tissue. <strong>Action:</strong> Increase repositioning frequency, relieve all pressure from the area, apply transparent film dressing if needed. Review risk assessment. Escalate to senior nurse same shift.</p>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-amber);">
+          <div class="badge red" style="margin-bottom: 10px;">Category 2</div>
+          <strong style="display:block; margin-bottom: 6px;">Partial Thickness Skin Loss / Open Blister</strong>
+          <p style="font-size:0.85rem; margin:0; color: var(--text-2);">Partial thickness skin loss with exposed dermis. Presents as a shallow open wound with a pink/red wound bed, or an intact / ruptured blister. <strong>Action:</strong> Mandatory incident report. Wound assessment and dressing by trained nurse. Photograph. Escalate to GP if signs of infection. Wound review every 1–3 days.</p>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-red);">
+          <div class="badge red" style="margin-bottom: 10px;">Category 3</div>
+          <strong style="display:block; margin-bottom: 6px;">Full Thickness Skin Loss — Subcutaneous Visible</strong>
+          <p style="font-size:0.85rem; margin:0; color: var(--text-2);">Full thickness skin loss where subcutaneous adipose (fat) tissue is visible but bone, tendon, or muscle is not exposed. Slough or eschar may be present but does not obscure depth. <strong>Action:</strong> Immediate SI review. GP/district nurse referral. Wound specialist nurse involvement. Family notification. Dynamic mattress mandatory.</p>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-red);">
+          <div class="badge red" style="margin-bottom: 10px;">Category 4</div>
+          <strong style="display:block; margin-bottom: 6px;">Full Thickness Skin & Tissue Loss — Bone/Tendon Exposed</strong>
+          <p style="font-size:0.85rem; margin:0; color: var(--text-2);">Full thickness skin and tissue loss with exposed or directly palpable fascia, muscle, tendon, ligament, cartilage, or bone. Slough or eschar may be present. Often undermining and tunnelling present. <strong>Action:</strong> Hospital referral. Surgical assessment may be required. Mandatory CQC notification consideration. High risk of osteomyelitis.</p>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--text-3);">
+          <div class="badge" style="background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border); margin-bottom: 10px;">Unstageable</div>
+          <strong style="display:block; margin-bottom: 6px;">Obscured Full Thickness Skin & Tissue Loss</strong>
+          <p style="font-size:0.85rem; margin:0; color: var(--text-2);">Full thickness skin and tissue loss where the depth cannot be confirmed because the wound bed is covered by slough or eschar. Until debrided, true depth cannot be determined. Cannot be staged lower than Category 3. <strong>Action:</strong> Do NOT remove eschar on ischemia/arterial wounds without vascular assessment. Refer to tissue viability specialist.</p>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-red);">
+          <div class="badge red" style="margin-bottom: 10px;">Deep Tissue Injury (DTI)</div>
+          <strong style="display:block; margin-bottom: 6px;">Persistent Non-blanchable Deep Red / Maroon / Purple</strong>
+          <p style="font-size:0.85rem; margin:0; color: var(--text-2);">Intact or non-intact skin with localised area of persistent non-blanchable deep red, maroon, or purple discolouration, or epidermal separation revealing a dark wound bed or blood-filled blister. Often evolves rapidly to expose actual extent of tissue injury under intact skin. <strong>Action:</strong> Treat as Category 3/4. Escalate immediately. Incident report.</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 24px; border-left: 5px solid var(--brand);">
+        <h3>Braden Scale Quick Reference — Risk Assessment</h3>
+        <p style="font-size:0.85rem; color:var(--text-2);">Complete the Braden Scale on admission and at every care plan review (minimum monthly). Score 6 domains (1–3 or 1–4 each). Lower score = higher risk.</p>
+        <div style="overflow-x:auto; margin-top: 12px;">
+          <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+            <thead><tr style="background:var(--surface-2);">
+              <th style="padding:8px 12px; text-align:left; border: 1px solid var(--border);">Total Score</th>
+              <th style="padding:8px 12px; text-align:left; border: 1px solid var(--border);">Risk Level</th>
+              <th style="padding:8px 12px; text-align:left; border: 1px solid var(--border);">Required Actions</th>
+            </tr></thead>
+            <tbody>
+              <tr><td style="padding:8px 12px; border:1px solid var(--border); font-weight:700; color:var(--pri-red);">≤9</td><td style="padding:8px 12px; border:1px solid var(--border);">Very High Risk</td><td style="padding:8px 12px; border:1px solid var(--border);">Dynamic mattress, 2-hourly reposition, dietitian referral, heel protectors</td></tr>
+              <tr><td style="padding:8px 12px; border:1px solid var(--border); font-weight:700; color:var(--pri-amber);">10–12</td><td style="padding:8px 12px; border:1px solid var(--border);">High Risk</td><td style="padding:8px 12px; border:1px solid var(--border);">Dynamic or high-spec foam, 2–3 hourly repositioning, dietitian review if MUST ≥1</td></tr>
+              <tr><td style="padding:8px 12px; border:1px solid var(--border); font-weight:700; color:var(--pri-amber);">13–14</td><td style="padding:8px 12px; border:1px solid var(--border);">Moderate Risk</td><td style="padding:8px 12px; border:1px solid var(--border);">High-spec foam mattress, 4-hourly repositioning, nutrition monitoring</td></tr>
+              <tr><td style="padding:8px 12px; border:1px solid var(--border); font-weight:700; color:var(--pri-green);">15–18</td><td style="padding:8px 12px; border:1px solid var(--border);">At Risk</td><td style="padding:8px 12px; border:1px solid var(--border);">Standard preventive care, monitor skin at repositioning</td></tr>
+              <tr><td style="padding:8px 12px; border:1px solid var(--border); font-weight:700; color:var(--pri-green);">19–23</td><td style="padding:8px 12px; border:1px solid var(--border);">Low Risk</td><td style="padding:8px 12px; border:1px solid var(--border);">Routine skin inspection, educate resident/family, maintain SSKIN principles</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 14: MUST NUTRITIONAL SCREENING -->
+    <section class="section-panel" id="must">
+      <h2>MUST: Malnutrition Universal Screening Tool <span class="reviewed-badge"><svg data-lucide="check-circle" style="width:12px;height:12px;"></svg> Reviewed Jun 2026</span></h2>
+      <div class="citation-bar">
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> BAPEN MUST Tool 2003/2016</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> NICE NG22 (Nutrition Support)</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> CQC Fundamental Standard (Nutrition)</span>
+      </div>
+
+      <div class="grid cols-2" style="align-items: start;">
+        <!-- Interactive Calculator -->
+        <div class="tool-card">
+          <div class="card-header"><svg data-lucide="calculator" style="color:var(--brand);"></svg><h3 style="margin:0;">MUST Score Calculator</h3></div>
+          <p style="font-size:0.85rem; color:var(--text-3); margin-bottom: 16px;">Complete on admission, monthly, and after any significant change in condition.</p>
+
+          <div class="tool-input-group">
+            <label>Step 1 — BMI Score</label>
+            <select id="mustBMI" onchange="Tools.calcMUST()">
+              <option value="">Select BMI range...</option>
+              <option value="0">BMI >20 kg/m² → Score 0</option>
+              <option value="1">BMI 18.5–20 kg/m² → Score 1</option>
+              <option value="2">BMI &lt;18.5 kg/m² → Score 2</option>
+              <option value="x">BMI cannot be measured (use alternative)</option>
+            </select>
+          </div>
+
+          <div class="tool-input-group">
+            <label>Step 2 — Unplanned Weight Loss Score <span style="font-weight:400; color:var(--text-3);">(past 3–6 months)</span></label>
+            <select id="mustWL" onchange="Tools.calcMUST()">
+              <option value="">Select weight loss...</option>
+              <option value="0">Less than 5% weight loss → Score 0</option>
+              <option value="1">5%–10% weight loss → Score 1</option>
+              <option value="2">More than 10% weight loss → Score 2</option>
+            </select>
+          </div>
+
+          <div class="tool-input-group">
+            <label>Step 3 — Acute Disease Effect</label>
+            <select id="mustAcute" onchange="Tools.calcMUST()">
+              <option value="">Select...</option>
+              <option value="0">No acute illness / eating as normal → Score 0</option>
+              <option value="2">Currently unwell, nil by mouth or very poor intake likely >5 days → Score 2</option>
+            </select>
+          </div>
+
+          <div class="score-display" id="mustResult">
+            <div class="score-label">Select all three steps above to calculate</div>
+          </div>
+
+          <button class="btn btn-secondary btn-sm" onclick="Tools.resetMUST()" style="width:100%;">
+            <svg data-lucide="rotate-ccw"></svg> Reset
+          </button>
+        </div>
+
+        <!-- Management Guide -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="border-top: 4px solid var(--pri-green);">
+            <div class="badge green" style="margin-bottom: 8px;">MUST Score 0 — Low Risk</div>
+            <strong style="font-size:0.88rem;">Routine Clinical Care</strong>
+            <ul style="font-size:0.85rem; margin: 8px 0 0; padding-left: 18px; line-height: 1.7;">
+              <li>Repeat MUST monthly in care homes</li>
+              <li>Document weight monthly</li>
+              <li>No immediate intervention required</li>
+            </ul>
+          </div>
+          <div class="card" style="border-top: 4px solid var(--pri-amber);">
+            <div class="badge amber" style="margin-bottom: 8px;">MUST Score 1 — Medium Risk</div>
+            <strong style="font-size:0.88rem;">Observe & Monitor</strong>
+            <ul style="font-size:0.85rem; margin: 8px 0 0; padding-left: 18px; line-height: 1.7;">
+              <li>Document all dietary intake for 3 days</li>
+              <li>Weigh weekly for 1 month</li>
+              <li>Offer nutritional snacks between meals</li>
+              <li>Encourage food fortification (butter, cream, cheese)</li>
+              <li>If improving: continue monitoring</li>
+              <li>If no improvement after 4 weeks: escalate to dietitian</li>
+            </ul>
+          </div>
+          <div class="card" style="border-top: 4px solid var(--pri-red);">
+            <div class="badge red" style="margin-bottom: 8px;">MUST Score ≥2 — High Risk</div>
+            <strong style="font-size:0.88rem;">Treat & Refer</strong>
+            <ul style="font-size:0.85rem; margin: 8px 0 0; padding-left: 18px; line-height: 1.7;">
+              <li><strong>Refer to dietitian urgently</strong></li>
+              <li>Initiate oral nutritional supplements per prescription (e.g. Fortisip, Ensure)</li>
+              <li>Increase calorie-dense foods at mealtimes</li>
+              <li>Food chart every meal — document all intake</li>
+              <li>Weigh weekly minimum</li>
+              <li>GP notification required</li>
+              <li>Consider SALT referral if swallowing concerns</li>
+            </ul>
+          </div>
+          <div class="caution-box">
+            <strong>⚠️ BMI Alternatives:</strong> If height/weight cannot be measured, use mid-arm circumference (MAC). MAC &lt;23.5 cm suggests low BMI (&lt;20). MAC ≥32 cm suggests BMI &gt;30.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 15: PAIN ASSESSMENT -->
+    <section class="section-panel" id="pain">
+      <h2>Pain Assessment Tools <span class="reviewed-badge"><svg data-lucide="check-circle" style="width:12px;height:12px;"></svg> Reviewed Jun 2026</span></h2>
+      <div class="citation-bar">
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> Abbey Pain Scale (Abbey et al. 2004)</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> NICE NG158 (Dementia)</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> PAINAD Scale (Warden et al. 2003)</span>
+      </div>
+
+      <div class="info-box" style="margin-bottom: 20px;">
+        <strong>ℹ️ Choosing the Right Tool:</strong> Use the <strong>Numeric Rating Scale (NRS 0–10)</strong> or verbal description for residents who can self-report. Use the <strong>Abbey Pain Scale</strong> for residents with moderate–severe dementia or who are non-verbal. Always document the tool used and the score obtained.
+      </div>
+
+      <div class="grid cols-2" style="align-items: start; margin-bottom: 24px;">
+        <!-- Abbey Pain Scale Calculator -->
+        <div>
+          <div class="tool-card">
+            <div class="card-header"><svg data-lucide="heart-pulse" style="color:var(--brand);"></svg><h3 style="margin:0;">Abbey Pain Scale — Interactive</h3></div>
+            <p style="font-size:0.82rem; color:var(--text-3); margin-bottom: 16px;">For non-verbal / advanced dementia residents. Score each of 6 items 0–3. Total score guides severity.</p>
+
+            <div class="abbey-item" id="abbey-0">
+              <label>1. Vocalisation</label>
+              <span class="abbey-desc">e.g. whimpering, groaning, crying</span>
+              <div class="abbey-options">
+                <button class="abbey-option" data-idx="0" data-val="0" onclick="Tools.setAbbey(0,0)">0 Absent</button>
+                <button class="abbey-option" data-idx="0" data-val="1" onclick="Tools.setAbbey(0,1)">1 Mild</button>
+                <button class="abbey-option" data-idx="0" data-val="2" onclick="Tools.setAbbey(0,2)">2 Moderate</button>
+                <button class="abbey-option" data-idx="0" data-val="3" onclick="Tools.setAbbey(0,3)">3 Severe</button>
+              </div>
+            </div>
+            <div class="abbey-item" id="abbey-1">
+              <label>2. Facial Expression</label>
+              <span class="abbey-desc">e.g. looking tense, frowning, grimacing, looking frightened</span>
+              <div class="abbey-options">
+                <button class="abbey-option" data-idx="1" data-val="0" onclick="Tools.setAbbey(1,0)">0 Absent</button>
+                <button class="abbey-option" data-idx="1" data-val="1" onclick="Tools.setAbbey(1,1)">1 Mild</button>
+                <button class="abbey-option" data-idx="1" data-val="2" onclick="Tools.setAbbey(1,2)">2 Moderate</button>
+                <button class="abbey-option" data-idx="1" data-val="3" onclick="Tools.setAbbey(1,3)">3 Severe</button>
+              </div>
+            </div>
+            <div class="abbey-item" id="abbey-2">
+              <label>3. Body Language</label>
+              <span class="abbey-desc">e.g. fidgeting, rocking, guarding part of body, withdrawn</span>
+              <div class="abbey-options">
+                <button class="abbey-option" data-idx="2" data-val="0" onclick="Tools.setAbbey(2,0)">0 Absent</button>
+                <button class="abbey-option" data-idx="2" data-val="1" onclick="Tools.setAbbey(2,1)">1 Mild</button>
+                <button class="abbey-option" data-idx="2" data-val="2" onclick="Tools.setAbbey(2,2)">2 Moderate</button>
+                <button class="abbey-option" data-idx="2" data-val="3" onclick="Tools.setAbbey(2,3)">3 Severe</button>
+              </div>
+            </div>
+            <div class="abbey-item" id="abbey-3">
+              <label>4. Behavioural Change</label>
+              <span class="abbey-desc">e.g. increased confusion, refusing to eat, altered usual patterns</span>
+              <div class="abbey-options">
+                <button class="abbey-option" data-idx="3" data-val="0" onclick="Tools.setAbbey(3,0)">0 Absent</button>
+                <button class="abbey-option" data-idx="3" data-val="1" onclick="Tools.setAbbey(3,1)">1 Mild</button>
+                <button class="abbey-option" data-idx="3" data-val="2" onclick="Tools.setAbbey(3,2)">2 Moderate</button>
+                <button class="abbey-option" data-idx="3" data-val="3" onclick="Tools.setAbbey(3,3)">3 Severe</button>
+              </div>
+            </div>
+            <div class="abbey-item" id="abbey-4">
+              <label>5. Physiological Change</label>
+              <span class="abbey-desc">e.g. temperature ↑, pulse/BP change, diaphoresis, flushing or pallor</span>
+              <div class="abbey-options">
+                <button class="abbey-option" data-idx="4" data-val="0" onclick="Tools.setAbbey(4,0)">0 Absent</button>
+                <button class="abbey-option" data-idx="4" data-val="1" onclick="Tools.setAbbey(4,1)">1 Mild</button>
+                <button class="abbey-option" data-idx="4" data-val="2" onclick="Tools.setAbbey(4,2)">2 Moderate</button>
+                <button class="abbey-option" data-idx="4" data-val="3" onclick="Tools.setAbbey(4,3)">3 Severe</button>
+              </div>
+            </div>
+            <div class="abbey-item" id="abbey-5">
+              <label>6. Physical Changes</label>
+              <span class="abbey-desc">e.g. skin tears, pressure areas, arthritis, contractures, previous injuries</span>
+              <div class="abbey-options">
+                <button class="abbey-option" data-idx="5" data-val="0" onclick="Tools.setAbbey(5,0)">0 Absent</button>
+                <button class="abbey-option" data-idx="5" data-val="1" onclick="Tools.setAbbey(5,1)">1 Mild</button>
+                <button class="abbey-option" data-idx="5" data-val="2" onclick="Tools.setAbbey(5,2)">2 Moderate</button>
+                <button class="abbey-option" data-idx="5" data-val="3" onclick="Tools.setAbbey(5,3)">3 Severe</button>
+              </div>
+            </div>
+
+            <div class="score-display" id="abbeyResult">
+              <div class="score-label">Select scores above to calculate</div>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <button class="btn btn-secondary btn-sm" onclick="Tools.resetAbbey()" style="flex:1;"><svg data-lucide="rotate-ccw"></svg> Reset</button>
+              <button class="btn btn-primary btn-sm" onclick="Tools.copyAbbeyResult()" style="flex:1;"><svg data-lucide="copy"></svg> Copy Result</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Other scales -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="border-left: 5px solid var(--brand);">
+            <div class="card-header"><svg data-lucide="bar-chart-2" style="color:var(--brand);"></svg><h4 class="card-title">Abbey Scale — Score Interpretation</h4></div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%; border-collapse:collapse; font-size:0.85rem; margin-top:8px;">
+                <thead><tr style="background:var(--surface-2);">
+                  <th style="padding:8px 10px; border:1px solid var(--border); text-align:left;">Score</th>
+                  <th style="padding:8px 10px; border:1px solid var(--border); text-align:left;">Severity</th>
+                  <th style="padding:8px 10px; border:1px solid var(--border); text-align:left;">Action</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td style="padding:8px 10px; border:1px solid var(--border); font-weight:700; color:var(--pri-green);">0–2</td><td style="padding:8px 10px; border:1px solid var(--border);">No pain</td><td style="padding:8px 10px; border:1px solid var(--border);">Continue monitoring</td></tr>
+                  <tr><td style="padding:8px 10px; border:1px solid var(--border); font-weight:700; color:var(--pri-amber);">3–7</td><td style="padding:8px 10px; border:1px solid var(--border);">Mild pain</td><td style="padding:8px 10px; border:1px solid var(--border);">Non-pharmacological interventions; review PRN analgesic</td></tr>
+                  <tr><td style="padding:8px 10px; border:1px solid var(--border); font-weight:700; color:var(--pri-amber);">8–13</td><td style="padding:8px 10px; border:1px solid var(--border);">Moderate pain</td><td style="padding:8px 10px; border:1px solid var(--border);">Administer PRN analgesic; contact GP if not responding</td></tr>
+                  <tr><td style="padding:8px 10px; border:1px solid var(--border); font-weight:700; color:var(--pri-red);">14+</td><td style="padding:8px 10px; border:1px solid var(--border);">Severe pain</td><td style="padding:8px 10px; border:1px solid var(--border);">Urgent GP contact; consider emergency admission if needed</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" style="border-left: 5px solid var(--accent);">
+            <div class="card-header"><svg data-lucide="sliders" style="color:var(--accent);"></svg><h4 class="card-title">NRS (Numeric Rating Scale) — Self-Report</h4></div>
+            <p style="font-size:0.85rem; color:var(--text-2);">Ask: <em>"On a scale of 0 to 10, where 0 is no pain and 10 is the worst pain imaginable, what is your pain level right now?"</em></p>
+            <div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:0.82rem; margin-top:8px;">
+              <thead><tr style="background:var(--surface-2);">
+                <th style="padding:6px 8px; border:1px solid var(--border);">Score</th>
+                <th style="padding:6px 8px; border:1px solid var(--border);">Severity</th>
+                <th style="padding:6px 8px; border:1px solid var(--border);">Nurse Action</th>
+              </tr></thead>
+              <tbody>
+                <tr><td style="padding:6px 8px; border:1px solid var(--border); color:var(--pri-green); font-weight:700;">0</td><td style="padding:6px 8px; border:1px solid var(--border);">No pain</td><td style="padding:6px 8px; border:1px solid var(--border);">Document; continue monitoring</td></tr>
+                <tr><td style="padding:6px 8px; border:1px solid var(--border); color:var(--pri-green); font-weight:700;">1–3</td><td style="padding:6px 8px; border:1px solid var(--border);">Mild</td><td style="padding:6px 8px; border:1px solid var(--border);">Non-pharmacological; offer PRN paracetamol if prescribed</td></tr>
+                <tr><td style="padding:6px 8px; border:1px solid var(--border); color:var(--pri-amber); font-weight:700;">4–6</td><td style="padding:6px 8px; border:1px solid var(--border);">Moderate</td><td style="padding:6px 8px; border:1px solid var(--border);">Administer PRN analgesic; re-assess in 30–60 min</td></tr>
+                <tr><td style="padding:6px 8px; border:1px solid var(--border); color:var(--pri-red); font-weight:700;">7–10</td><td style="padding:6px 8px; border:1px solid var(--border);">Severe</td><td style="padding:6px 8px; border:1px solid var(--border);">Contact GP/prescriber for stronger analgesia review; NEWS2</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+
+          <div class="card" style="border-left: 5px solid var(--pri-amber);">
+            <div class="card-header"><svg data-lucide="alert-triangle" style="color:var(--pri-amber);"></svg><h4 class="card-title">Pain in Dementia — Key Principles</h4></div>
+            <ul style="font-size:0.85rem; line-height:1.8; padding-left: 18px; margin:0; color: var(--text-2);">
+              <li>Behavioural changes (aggression, withdrawal, refusal of care) may be the only sign of pain in advanced dementia</li>
+              <li>Reassess pain score after any analgesic intervention — within 30 min for oral, 15 min for SC</li>
+              <li>Use consistent documentation wording: "Abbey Pain Scale score [X]/18, consistent with [mild/moderate/severe] pain"</li>
+              <li>If behaviour suggests pain and regular paracetamol is not prescribed, contact GP for a regular analgesic review</li>
+              <li>Avoid NSAIDs in elderly as first-line; consider risk of GI bleed, fluid retention, and renal impairment</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 16: CONTROLLED DRUGS -->
+    <section class="section-panel" id="cds">
+      <h2>Controlled Drugs (CDs) — Care Home Reference <span class="reviewed-badge"><svg data-lucide="check-circle" style="width:12px;height:12px;"></svg> Reviewed Jun 2026</span></h2>
+      <div class="citation-bar">
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> Misuse of Drugs Act 1971</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> Misuse of Drugs Regulations 2001</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> CQC CD Guidance 2022</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> BNF Appendix 1</span>
+      </div>
+
+      <div class="warning-box" style="margin-bottom: 20px;">
+        <strong>🚨 Zero Tolerance:</strong> Any CD discrepancy must be reported to the Registered Manager and investigated immediately on discovery. Do not wait until the end of shift. An unexplained discrepancy may indicate theft or diversion — document everything and preserve evidence.
+      </div>
+
+      <div class="grid cols-2" style="margin-bottom: 24px;">
+        <div class="card" style="border-left: 5px solid var(--pri-red);">
+          <div class="card-header"><svg data-lucide="lock" style="color:var(--pri-red);"></svg><h3 class="card-title">Schedule 2 CDs</h3></div>
+          <div class="badge red" style="margin-bottom: 10px;">Highest Control — Full Register Required</div>
+          <p style="font-size:0.85rem; color:var(--text-2); margin-bottom: 10px;">Must be stored in a locked, wall-fixed, dedicated CD cabinet. CD register entry required for every administration, receipt, disposal, and return.</p>
+          <strong style="font-size:0.85rem;">Common examples in care homes:</strong>
+          <ul style="font-size:0.84rem; padding-left: 18px; margin: 8px 0; line-height: 1.8; color:var(--text-2);">
+            <li>Morphine (oral liquid, MST tablets, subcutaneous)</li>
+            <li>Diamorphine (subcutaneous — palliative care)</li>
+            <li>Oxycodone (OxyContin, OxyNorm)</li>
+            <li>Fentanyl patches (Durogesic, Matrifen)</li>
+            <li>Buprenorphine patches (Butrans, Transtec)</li>
+            <li>Methylphenidate (Ritalin — rare in care homes)</li>
+          </ul>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-amber);">
+          <div class="card-header"><svg data-lucide="lock" style="color:var(--pri-amber);"></svg><h3 class="card-title">Schedule 3 CDs</h3></div>
+          <div class="badge amber" style="margin-bottom: 10px;">High Control — Safe Storage Required</div>
+          <p style="font-size:0.85rem; color:var(--text-2); margin-bottom: 10px;">Must be stored in a locked CD cabinet. Running balance not legally required but recommended by CQC. Check local policy.</p>
+          <strong style="font-size:0.85rem;">Common examples:</strong>
+          <ul style="font-size:0.84rem; padding-left: 18px; margin: 8px 0; line-height: 1.8; color:var(--text-2);">
+            <li>Temazepam (requires CD register entry)</li>
+            <li>Pregabalin (requires safe custody)</li>
+            <li>Gabapentin (requires safe custody)</li>
+            <li>Tramadol (requires safe custody)</li>
+            <li>Buprenorphine sublingual (Subutex)</li>
+          </ul>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-blue);">
+          <div class="card-header"><svg data-lucide="lock" style="color:var(--pri-blue);"></svg><h3 class="card-title">Schedule 4 CDs</h3></div>
+          <div class="badge blue" style="margin-bottom: 10px;">Moderate Control — Locked Storage</div>
+          <p style="font-size:0.85rem; color:var(--text-2); margin-bottom: 10px;">Must be kept in a locked cupboard. No CD register legally required. No running balance required.</p>
+          <strong style="font-size:0.85rem;">Common examples:</strong>
+          <ul style="font-size:0.84rem; padding-left: 18px; margin: 8px 0; line-height: 1.8; color:var(--text-2);">
+            <li>Diazepam, lorazepam, midazolam (SC)</li>
+            <li>Clonazepam, nitrazepam, oxazepam</li>
+            <li>Zopiclone, zolpidem (Z-drugs)</li>
+            <li>Alprazolam, chlordiazepoxide</li>
+          </ul>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-green);">
+          <div class="card-header"><svg data-lucide="lock" style="color:var(--pri-green);"></svg><h3 class="card-title">Schedule 5 CDs</h3></div>
+          <div class="badge green" style="margin-bottom: 10px;">Minimal Control</div>
+          <p style="font-size:0.85rem; color:var(--text-2); margin-bottom: 10px;">No requirement for CD safe storage. Treated as standard medicines. Retain invoices for 2 years.</p>
+          <strong style="font-size:0.85rem;">Common examples:</strong>
+          <ul style="font-size:0.84rem; padding-left: 18px; margin: 8px 0; line-height: 1.8; color:var(--text-2);">
+            <li>Low-dose codeine preparations (e.g. co-codamol 8/500)</li>
+            <li>Dihydrocodeine 10mg tablets</li>
+            <li>Kaolin and morphine mixture</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card" style="border-left: 5px solid var(--brand); margin-bottom: 20px;">
+        <h3>CD Administration Rules — Every Time</h3>
+        <ol style="font-size:0.88rem; line-height:2; padding-left: 20px; margin:0; color:var(--text-2);">
+          <li><strong>Two witnesses</strong> must be present for Schedule 2 CD administration — both must sign the CD register. One must be an RN. Check local policy for who can act as second witness (some allow a trained competent care worker).</li>
+          <li><strong>Check prescription</strong> — confirm drug name, dose, route, frequency, and prescriber signature before drawing up.</li>
+          <li><strong>Check identity</strong> — confirm resident's full name, date of birth, and check allergy wristband / MAR chart before administering.</li>
+          <li><strong>CD register entry</strong> (Schedule 2): Date, time, resident name, amount given, current stock balance, signatures of both witnesses. Running balance must be updated immediately after administration.</li>
+          <li><strong>Stock balance check</strong>: Count the physical stock and reconcile with the register balance every time the cupboard is accessed. Discrepancy = stop, lock, report immediately.</li>
+          <li><strong>Key control</strong>: The CD cabinet key must remain in the possession of the responsible nurse at all times on shift. Keys must never be left in the lock.</li>
+        </ol>
+      </div>
+
+      <div class="grid cols-2">
+        <div class="card" style="border-left: 5px solid var(--pri-red);">
+          <h3>CD Destruction & Return</h3>
+          <ul style="font-size:0.85rem; line-height:1.8; padding-left: 18px; margin:0; color:var(--text-2);">
+            <li>Schedule 2 CDs <strong>cannot be destroyed</strong> in a care home without an authorised witness (pharmacist, Inspector from Home Office, police officer, or authorised destruction nurse under local policy).</li>
+            <li>Unused/expired Schedule 2 CDs should be returned to the supplying pharmacy — document in the CD register.</li>
+            <li>Patches: fold sticky side inward, document in register, return to pharmacy in a denaturing kit or sealed waste container.</li>
+            <li>CD destruction must be recorded in the CD register: date, quantity destroyed, method, witness signature.</li>
+          </ul>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--brand);">
+          <h3>PRN CD Prescriptions</h3>
+          <ul style="font-size:0.85rem; line-height:1.8; padding-left: 18px; margin:0; color:var(--text-2);">
+            <li>PRN (as required) CDs must have a written prescription specifying: drug, dose, route, indication, maximum frequency, and maximum daily dose.</li>
+            <li>Verbal orders are not acceptable for CDs.</li>
+            <li>Subcutaneous breakthrough morphine dose is typically <strong>1/6th of the total regular daily oral morphine dose</strong> — always check the valid prescription.</li>
+            <li>Document every PRN administration in the CD register and on the MAR chart.</li>
+            <li>If a PRN CD has been given and pain not controlled after one dose, contact GP/palliative care before repeating.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 17: ORAL HEALTH -->
+    <section class="section-panel" id="oral">
+      <h2>Oral Health in Care Homes <span class="reviewed-badge"><svg data-lucide="check-circle" style="width:12px;height:12px;"></svg> Reviewed Jun 2026</span></h2>
+      <div class="citation-bar">
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> NICE NG48 (Oral Health for Adults in Care Homes 2016)</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> CQC Oral Health Assessment</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> Oral Health Foundation</span>
+      </div>
+
+      <div class="caution-box" style="margin-bottom: 20px;">
+        <strong>⚠️ CQC Inspection Focus:</strong> CQC regularly flags oral health as a concern during inspections. All residents must have an oral health assessment on admission, a care plan that reflects oral health needs, and evidence that staff support oral hygiene as part of personal care. Failure to demonstrate this can result in a "Requires Improvement" rating.
+      </div>
+
+      <div class="grid cols-2" style="margin-bottom: 24px;">
+        <div class="card" style="border-left: 5px solid var(--brand);">
+          <div class="card-header"><svg data-lucide="clipboard-check" style="color:var(--brand);"></svg><h3 class="card-title">Admission Oral Health Assessment</h3></div>
+          <p style="font-size:0.85rem; color:var(--text-2); margin-bottom: 12px;">Complete within 24 hours of admission. Record findings in the care plan.</p>
+          <ul style="font-size:0.84rem; padding-left: 18px; margin:0; line-height: 1.9; color:var(--text-2);">
+            <li>Does the resident have natural teeth? How many? Any loose, broken, or painful teeth?</li>
+            <li>Does the resident wear dentures (upper/lower/both)? Are they labelled? Do they fit?</li>
+            <li>Is there any mouth pain, bleeding gums, or swelling?</li>
+            <li>Is there evidence of dry mouth (xerostomia)? — common side effect of many medications including anticholinergics, diuretics, antidepressants</li>
+            <li>Does the resident have a dental care plan in place? When did they last see a dentist?</li>
+            <li>Can the resident clean their own teeth? Do they require prompting, supervision, or full assistance?</li>
+            <li>Record: name of usual dentist and registration status</li>
+          </ul>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--brand);">
+          <div class="card-header"><svg data-lucide="calendar" style="color:var(--brand);"></svg><h3 class="card-title">Daily Oral Care Protocol</h3></div>
+          <p style="font-size:0.85rem; color:var(--text-2); margin-bottom: 12px;">Per NICE NG48 — oral hygiene assistance at least twice daily.</p>
+          <ul style="font-size:0.84rem; padding-left: 18px; margin:0; line-height: 1.9; color:var(--text-2);">
+            <li><strong>Natural teeth:</strong> Brush with fluoride toothpaste (1000–1450 ppm) for 2 minutes, twice daily. Use a soft-bristled brush. Do not rinse after brushing — spit only.</li>
+            <li><strong>Dentures:</strong> Remove and brush daily with a denture brush. Soak overnight in cold water or specialist denture cleaner (not hot water — warps). Label all dentures.</li>
+            <li><strong>Non-verbal/dysphagia residents:</strong> Use a small-headed toothbrush or foam swabs with water/chlorhexidine gel. Position upright. Suction available if needed. Never use glycerin swabs as the sole mouth care — they dry the mouth.</li>
+            <li><strong>Dry mouth:</strong> Offer frequent sips of water. Prescribable artificial saliva sprays (e.g. BioXtra) may be indicated — discuss with GP.</li>
+          </ul>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-red);">
+          <div class="card-header"><svg data-lucide="alert-octagon" style="color:var(--pri-red);"></svg><h3 class="card-title">When to Refer to a Dentist</h3></div>
+          <ul style="font-size:0.84rem; padding-left: 18px; margin:0; line-height: 1.9; color:var(--text-2);">
+            <li>Complaint of toothache or mouth pain</li>
+            <li>Visible broken, cracked, or decayed teeth</li>
+            <li>Swollen or bleeding gums</li>
+            <li>Dentures that no longer fit, causing sores</li>
+            <li>Difficulty eating due to dental problems</li>
+            <li>Mouth ulcers lasting more than 2 weeks — rule out oral cancer</li>
+            <li>White patches (leukoplakia) or red patches (erythroplakia) in the mouth — urgent dental/oral medicine referral</li>
+            <li>No dental review in the past 12 months</li>
+          </ul>
+          <div class="caution-box" style="margin-top: 12px; padding: 8px 12px;">
+            <strong>Access:</strong> Residents have the right to NHS dental care. Community dental services (CDS) provide domiciliary visits for housebound residents. Contact your local NHS dental helpline or GP for referral.
+          </div>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-amber);">
+          <div class="card-header"><svg data-lucide="pill" style="color:var(--pri-amber);"></svg><h3 class="card-title">Medications & Oral Health</h3></div>
+          <p style="font-size:0.85rem; color:var(--text-2); margin-bottom: 10px;">Many common care home medications cause oral problems:</p>
+          <div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+            <thead><tr style="background:var(--surface-2);">
+              <th style="padding:6px 10px; border:1px solid var(--border); text-align:left;">Drug / Class</th>
+              <th style="padding:6px 10px; border:1px solid var(--border); text-align:left;">Oral Side Effect</th>
+            </tr></thead>
+            <tbody>
+              <tr><td style="padding:6px 10px; border:1px solid var(--border);">Anticholinergics, diuretics, antidepressants</td><td style="padding:6px 10px; border:1px solid var(--border);">Dry mouth (xerostomia) — increases decay risk</td></tr>
+              <tr><td style="padding:6px 10px; border:1px solid var(--border);">Amlodipine (calcium channel blocker)</td><td style="padding:6px 10px; border:1px solid var(--border);">Gingival overgrowth (gum swelling)</td></tr>
+              <tr><td style="padding:6px 10px; border:1px solid var(--border);">Phenytoin</td><td style="padding:6px 10px; border:1px solid var(--border);">Gingival hyperplasia</td></tr>
+              <tr><td style="padding:6px 10px; border:1px solid var(--border);">Antibiotics (broad spectrum)</td><td style="padding:6px 10px; border:1px solid var(--border);">Oral candidiasis (thrush)</td></tr>
+              <tr><td style="padding:6px 10px; border:1px solid var(--border);">Steroid inhalers</td><td style="padding:6px 10px; border:1px solid var(--border);">Oral candidiasis — advise rinsing mouth after use</td></tr>
+              <tr><td style="padding:6px 10px; border:1px solid var(--border);">Aspirin, bisphosphonates</td><td style="padding:6px 10px; border:1px solid var(--border);">Mucosal ulceration / osteonecrosis of jaw (bisphosphonates)</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 18: SAFEGUARDING -->
+    <section class="section-panel" id="safeguarding">
+      <h2>Safeguarding Adults — Reference Guide <span class="reviewed-badge"><svg data-lucide="check-circle" style="width:12px;height:12px;"></svg> Reviewed Jun 2026</span></h2>
+      <div class="citation-bar">
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> Care Act 2014 (Sections 42–46)</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> Mental Capacity Act 2005</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> Human Rights Act 1998</span>
+        <span class="citation-chip"><svg data-lucide="book-open" style="width:11px;height:11px;"></svg> CQC Fundamental Standard 13</span>
+      </div>
+
+      <div class="warning-box" style="margin-bottom: 20px;">
+        <strong>🚨 Your Duty:</strong> All staff have a legal and professional duty to report safeguarding concerns. You do not need proof — if you have a reasonable concern or suspicion, you must report it. Failure to report is itself a safeguarding concern. NMC Code requires you to act on suspicions of abuse immediately.
+      </div>
+
+      <div class="grid cols-2" style="margin-bottom: 24px;">
+        <div class="card" style="border-left: 5px solid var(--brand);">
+          <div class="card-header"><svg data-lucide="shield" style="color:var(--brand);"></svg><h3 class="card-title">Care Act 2014 — 6 Safeguarding Principles</h3></div>
+          <ol style="font-size:0.88rem; line-height:2; padding-left: 20px; margin:0; color:var(--text-2);">
+            <li><strong>Empowerment</strong> — People are supported to make their own decisions and informed consent is gained</li>
+            <li><strong>Prevention</strong> — It is better to take action before harm occurs</li>
+            <li><strong>Proportionality</strong> — The least intrusive response appropriate to the risk presented</li>
+            <li><strong>Protection</strong> — Support and representation for those in greatest need</li>
+            <li><strong>Partnership</strong> — Local solutions through services working with communities</li>
+            <li><strong>Accountability</strong> — Accountability and transparency in safeguarding practice</li>
+          </ol>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-red);">
+          <div class="card-header"><svg data-lucide="list" style="color:var(--pri-red);"></svg><h3 class="card-title">10 Types of Abuse (Care Act 2014)</h3></div>
+          <ol style="font-size:0.85rem; line-height:1.9; padding-left: 20px; margin:0; color:var(--text-2);">
+            <li><strong>Physical</strong> — hitting, restraining, over-sedating, inappropriate use of medication</li>
+            <li><strong>Domestic Violence</strong> — including from family members or partners</li>
+            <li><strong>Sexual</strong> — including in those who lack capacity</li>
+            <li><strong>Psychological / Emotional</strong> — threats, humiliation, coercion, gaslighting</li>
+            <li><strong>Financial / Material</strong> — theft, fraud, pressure over wills, financial exploitation</li>
+            <li><strong>Modern Slavery</strong> — exploitation, forced labour, trafficking</li>
+            <li><strong>Discriminatory</strong> — based on race, disability, religion, gender, sexuality</li>
+            <li><strong>Organisational</strong> — systemic poor care, cultural abuse, neglect in institutions</li>
+            <li><strong>Neglect / Omission</strong> — ignoring medical or physical needs, withholding care</li>
+            <li><strong>Self-neglect</strong> — extreme self-neglect endangering health and safety</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="card" style="border-left: 5px solid var(--pri-amber); margin-bottom: 20px;">
+        <div class="card-header"><svg data-lucide="alert-triangle" style="color:var(--pri-amber);"></svg><h3 class="card-title">Signs & Indicators of Abuse</h3></div>
+        <div class="grid cols-2">
+          <div>
+            <strong style="font-size:0.88rem; display:block; margin-bottom: 6px;">Physical Indicators:</strong>
+            <ul style="font-size:0.84rem; padding-left: 18px; margin:0 0 12px; line-height:1.8; color:var(--text-2);">
+              <li>Unexplained bruising, burns, fractures, or injuries</li>
+              <li>Injuries inconsistent with explanation given</li>
+              <li>Multiple injuries at different stages of healing</li>
+              <li>Repeated unexplained falls or "accidents"</li>
+              <li>Poor hygiene, pressure ulcers, malnutrition that could have been prevented</li>
+              <li>Unexplained weight loss</li>
+            </ul>
+          </div>
+          <div>
+            <strong style="font-size:0.88rem; display:block; margin-bottom: 6px;">Behavioural / Emotional Indicators:</strong>
+            <ul style="font-size:0.84rem; padding-left: 18px; margin:0 0 12px; line-height:1.8; color:var(--text-2);">
+              <li>Unexplained fear, anxiety, or withdrawal</li>
+              <li>Reluctance to be alone with specific staff or visitors</li>
+              <li>Flinching when approached or touched</li>
+              <li>Change in behaviour or mood without clear cause</li>
+              <li>Denial of obvious problems ("I'm fine, I fell")</li>
+              <li>Sudden change in financial situation</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="border-left: 5px solid var(--brand); margin-bottom: 20px;">
+        <div class="card-header"><svg data-lucide="git-branch" style="color:var(--brand);"></svg><h3 class="card-title">Reporting Pathway — What to Do</h3></div>
+        <ol style="font-size:0.88rem; line-height:2; padding-left: 20px; margin: 0 0 16px; color:var(--text-2);">
+          <li><strong>Ensure immediate safety</strong> — If the resident is in immediate danger, call 999. Remove them from the situation if safe to do so.</li>
+          <li><strong>Do not investigate yourself</strong> — Your role is to report, not investigate. Do not question the alleged perpetrator or the resident at length.</li>
+          <li><strong>Preserve evidence</strong> — Do not wash clothing, move items, or clean the scene until advised by the police/safeguarding team.</li>
+          <li><strong>Document accurately</strong> — Record what the resident said verbatim (use quotation marks). Note the time, date, setting, and your observations. Do not interpret or embellish.</li>
+          <li><strong>Report to your manager</strong> — The Registered Manager has 24 hours to refer to the Local Authority Safeguarding Adults team if required under Section 42 enquiry criteria.</li>
+          <li><strong>Notify CQC</strong> — Significant harm incidents must be reported as a Statutory Notification to CQC within 48 hours.</li>
+          <li><strong>LADO referral</strong> — If the alleged abuser is a staff member, volunteer, or person in a position of trust, refer to the Local Authority Designated Officer (LADO) within 1 working day.</li>
+        </ol>
+        <div class="warning-box" style="margin-top: 0; padding: 10px 12px;">
+          <strong>🔒 Confidentiality vs Duty to Act:</strong> Safeguarding concerns override normal confidentiality rules. You must report even if the resident asks you not to — but you should explain this to them, involve them in decisions where possible, and be honest about what you will do.
+        </div>
+      </div>
+
+      <div class="grid cols-2">
+        <div class="card" style="border-left: 5px solid var(--pri-red);">
+          <h3>What NOT to Do</h3>
+          <ul style="font-size:0.85rem; line-height:1.9; padding-left: 18px; margin:0; color:var(--text-2);">
+            <li>Do not promise confidentiality to the resident</li>
+            <li>Do not confront the alleged perpetrator</li>
+            <li>Do not carry out your own investigation</li>
+            <li>Do not remove clothing to examine injuries unless medically necessary</li>
+            <li>Do not take photographs on your personal phone without manager authorisation</li>
+            <li>Do not discuss the concern with other residents or uninvolved staff</li>
+            <li>Do not delay reporting — same shift, always</li>
+          </ul>
+        </div>
+        <div class="card" style="border-left: 5px solid var(--pri-green);">
+          <h3>Key Contacts to Know</h3>
+          <ul style="font-size:0.85rem; line-height:1.9; padding-left: 18px; margin:0; color:var(--text-2);">
+            <li><strong>Emergency / Immediate Danger:</strong> 999</li>
+            <li><strong>Local Authority Adult Safeguarding Team:</strong> Find via your local council website</li>
+            <li><strong>LADO (staff allegations):</strong> Via local authority children's/adults' services</li>
+            <li><strong>CQC Statutory Notification:</strong> CQC online portal</li>
+            <li><strong>Police (non-emergency crime):</strong> 101</li>
+            <li><strong>Hourglass (older people's abuse helpline):</strong> 0808 808 8141 (freephone)</li>
+            <li><strong>NMC fitness to practise (RN concern):</strong> 020 7637 7181</li>
+          </ul>
+        </div>
       </div>
     </section>
 
@@ -4435,6 +5347,32 @@ const App = {
     this.setupFilters();
     this.renderMDT();
     this.selectTplCategory('daily');
+
+    // Restore last visited section from localStorage
+    const lastSection = localStorage.getItem('nhub-section');
+    if (lastSection && document.getElementById(lastSection)) {
+      this.go(lastSection);
+      const tab = document.querySelector(`.nav-tab[data-target="${lastSection}"]`);
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      if (tab) tab.classList.add('active');
+    }
+
+    // Add "Last Reviewed" dates to existing static sections
+    const sectionDates = {
+      conditions: 'Jun 2026', medications: 'Jun 2026', worsen: 'Jun 2026',
+      highrisk: 'Jun 2026', falls: 'Jun 2026', admin: 'Jun 2026',
+      safety: 'Jun 2026', sbar: 'Jun 2026', dols: 'Jun 2026',
+      templates: 'Jun 2026', mdt: 'Jun 2026'
+    };
+    Object.entries(sectionDates).forEach(([id, date]) => {
+      const h2 = document.querySelector(`#${id} h2`);
+      if (h2 && !h2.querySelector('.reviewed-badge')) {
+        const badge = document.createElement('span');
+        badge.className = 'reviewed-badge';
+        badge.innerHTML = `<svg data-lucide="check-circle" style="width:12px;height:12px;"></svg> Reviewed ${date}`;
+        h2.appendChild(badge);
+      }
+    });
   },
 
   bindEvents() {
@@ -4470,11 +5408,33 @@ const App = {
       if (currentTheme === 'dark') {
         document.documentElement.removeAttribute('data-theme');
         themeBtn.innerHTML = '<svg data-lucide="moon"></svg>';
+        localStorage.setItem('nhub-theme', 'light');
       } else {
         document.documentElement.setAttribute('data-theme', 'dark');
         themeBtn.innerHTML = '<svg data-lucide="sun"></svg>';
+        localStorage.setItem('nhub-theme', 'dark');
       }
       if (window.lucide) lucide.createIcons();
+    });
+
+    // Set correct icon on load based on current theme
+    if (document.documentElement.getAttribute('data-theme') === 'dark') {
+      themeBtn.innerHTML = '<svg data-lucide="sun"></svg>';
+    }
+
+    // Cmd+K / Ctrl+K to focus search
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.getElementById('globalSearch');
+        searchInput.focus();
+        searchInput.select();
+      }
+      // Escape to close search
+      if (e.key === 'Escape') {
+        document.getElementById('searchResults').classList.remove('show');
+        document.getElementById('globalSearch').blur();
+      }
     });
 
     // Global Search
@@ -4525,17 +5485,18 @@ const App = {
   go(sectionId) {
     const panels = document.querySelectorAll('.section-panel');
     panels.forEach(p => p.classList.remove('active'));
-    
+
     const targetPanel = document.getElementById(sectionId);
     if (targetPanel) {
       targetPanel.classList.add('active');
       this.currentSection = sectionId;
+      localStorage.setItem('nhub-section', sectionId);
     }
-    
+
     // Focus view
     document.getElementById('mainView').focus({ preventScroll: true });
     window.scrollTo({ top: 0 });
-    
+
     if (window.lucide) lucide.createIcons();
   },
 
@@ -5316,7 +6277,19 @@ const Chat = {
     if (window.lucide) lucide.createIcons();
 
     // Prepare systemic prompt
-    const SYSTEM_PROMPT = "You are a Senior Clinical Lead Nurse and Advisor for UK care homes. Speak and advise with the authority, clarity, and precision of a top clinical nurse. Always respond in plain, shift-friendly English. Keep responses extremely concise, short, and highly summarized. Limit responses to a summary format (under 250 words total). Structure every response with brief headings (using ## for main sections) and bullet points. Always include a brief '📋 Clinical Summary & Priorities' section at the top. Always end with a clearly highlighted, short '🚨 Critical Red Flags & Escalation' section. Never give specific prescribing advice — recommend checking with GP, pharmacist, or BNF. Keep explanations highly concise and immediately actionable on shift.";
+    const SYSTEM_PROMPT = `You are a Senior Clinical Lead Nurse and registered pharmacist advisor specialising in UK care home nursing. Today's date is ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}.
+
+CORE RULES — follow every time:
+1. Base all clinical advice on current UK guidelines: NICE guidelines (cite the specific guideline number e.g. NICE NG185), the BNF (cite the section), MHRA drug safety updates, NHS England guidance, and CQC fundamental standards.
+2. Respond in plain, shift-ready English. Structure with ## headings and bullet points.
+3. Always open with a '📋 Clinical Summary' section (3 bullets max — the single most important things a nurse needs to know RIGHT NOW).
+4. Always close with a '🚨 Red Flags & Escalation' section listing specific triggers for 999 / GP / pharmacist contact.
+5. When citing drug doses or interactions, say "per BNF [section]" or "per NICE [guideline]" and always recommend the nurse verify against the resident's prescription and the current BNF before acting.
+6. Never give specific prescribing advice — that is for the GP/prescriber. You advise on nursing observation, monitoring, administration, and when to escalate.
+7. Flag if any guidance you provide may have been updated recently — care home guidelines evolve frequently.
+8. For safeguarding concerns, always cite Care Act 2014 s.42 and advise reporting to Local Authority Safeguarding Adults team.
+9. For controlled drugs, reference Misuse of Drugs Regulations 2001 and CQC CD guidance.
+10. Keep total response under 400 words unless the question genuinely requires more detail.`;
     const fullPrompt = SYSTEM_PROMPT + "\n\nQuestion: " + text;
 
     try {
@@ -5538,11 +6511,326 @@ const Chat = {
 };
 
 /* ============================================================
+   TOAST UTILITY
+   ============================================================ */
+function showToast(msg, duration = 2200) {
+  let container = document.getElementById('toastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => toast.classList.add('show'));
+  });
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 250);
+  }, duration);
+}
+
+/* ============================================================
+   BOOKMARKS
+   ============================================================ */
+const Bookmarks = {
+  STORAGE_KEY: 'nhub-bookmarks',
+
+  get() {
+    try { return JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '[]'); }
+    catch { return []; }
+  },
+
+  toggle(sectionId) {
+    let list = this.get();
+    if (list.includes(sectionId)) {
+      list = list.filter(s => s !== sectionId);
+      showToast('Bookmark removed');
+    } else {
+      list.push(sectionId);
+      showToast('Section bookmarked');
+    }
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(list));
+    this.render();
+  },
+
+  render() {
+    const bookmarks = this.get();
+    // Update bookmark buttons on sidebar tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      const section = tab.dataset.target;
+      if (!section) return;
+
+      let btn = tab.querySelector('.bookmark-btn');
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.className = 'bookmark-btn';
+        btn.title = 'Bookmark this section';
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          Bookmarks.toggle(section);
+        });
+        tab.appendChild(btn);
+      }
+      const isBookmarked = bookmarks.includes(section);
+      btn.classList.toggle('bookmarked', isBookmarked);
+      btn.innerHTML = isBookmarked
+        ? '<svg data-lucide="bookmark-check"></svg>'
+        : '<svg data-lucide="bookmark"></svg>';
+    });
+
+    // Show bookmarks section in sidebar footer if any
+    let footer = document.querySelector('.sidebar-footer');
+    let bSection = document.getElementById('bookmarksList');
+    if (!bSection && footer) {
+      bSection = document.createElement('div');
+      bSection.id = 'bookmarksList';
+      footer.before(bSection);
+    }
+    if (bSection) {
+      if (bookmarks.length === 0) {
+        bSection.innerHTML = '';
+      } else {
+        const allTabs = Array.from(document.querySelectorAll('.nav-tab[data-target]'));
+        const labels = {};
+        allTabs.forEach(t => { labels[t.dataset.target] = t.textContent.trim().replace(/[\u{1F000}-\u{1FFFF}]/gu, '').trim(); });
+        bSection.innerHTML = `
+          <div class="nav-group" style="margin-top:0;">Bookmarked</div>
+          ${bookmarks.map(s => `
+            <button class="nav-tab" onclick="App.go('${s}'); document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active')); this.classList.add('active');" style="color:var(--brand);">
+              <svg data-lucide="bookmark-check"></svg>${labels[s] || s}
+            </button>
+          `).join('')}
+        `;
+      }
+    }
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  init() { this.render(); }
+};
+
+/* ============================================================
+   INTERACTIVE TOOLS (MUST + Abbey Pain Scale + SBAR Copy)
+   ============================================================ */
+const Tools = {
+  abbeyScores: [null, null, null, null, null, null],
+
+  calcMUST() {
+    const bmi = document.getElementById('mustBMI')?.value;
+    const wl = document.getElementById('mustWL')?.value;
+    const acute = document.getElementById('mustAcute')?.value;
+    const result = document.getElementById('mustResult');
+    if (!result) return;
+
+    if (bmi === '' || wl === '' || acute === '' || bmi === undefined) {
+      result.innerHTML = '<div class="score-label">Select all three steps above to calculate</div>';
+      return;
+    }
+    if (bmi === 'x') {
+      result.innerHTML = '<div class="score-label">Cannot calculate — BMI unmeasurable. Use mid-arm circumference or estimate. Treat clinically as at-risk.</div>';
+      return;
+    }
+    const total = parseInt(bmi) + parseInt(wl) + parseInt(acute);
+    let label = '', color = '', action = '';
+    if (total === 0) { label = 'Low Risk'; color = 'var(--pri-green)'; action = 'Routine clinical care. Repeat MUST monthly.'; }
+    else if (total === 1) { label = 'Medium Risk'; color = 'var(--pri-amber)'; action = 'Observe — document dietary intake, weigh weekly, offer nutritional snacks.'; }
+    else { label = 'High Risk'; color = 'var(--pri-red)'; action = 'Refer to dietitian urgently. Start oral nutritional supplements. GP notification required.'; }
+
+    result.innerHTML = `
+      <div class="score-number" style="color:${color}">${total}</div>
+      <div class="score-label">Total MUST Score</div>
+      <div class="score-interpretation" style="color:${color}">${label}</div>
+      <p style="font-size:0.83rem; margin:8px 0 0; color:var(--text-2);">${action}</p>
+    `;
+  },
+
+  resetMUST() {
+    ['mustBMI','mustWL','mustAcute'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const result = document.getElementById('mustResult');
+    if (result) result.innerHTML = '<div class="score-label">Select all three steps above to calculate</div>';
+  },
+
+  setAbbey(index, value) {
+    this.abbeyScores[index] = value;
+    // Update button styles
+    const options = document.querySelectorAll(`.abbey-option[data-idx="${index}"]`);
+    options.forEach(btn => {
+      btn.classList.toggle('selected', parseInt(btn.dataset.val) === value);
+    });
+    this.calcAbbey();
+  },
+
+  calcAbbey() {
+    const result = document.getElementById('abbeyResult');
+    if (!result) return;
+    const filled = this.abbeyScores.filter(s => s !== null);
+    if (filled.length < 6) {
+      result.innerHTML = `<div class="score-label">${filled.length}/6 items scored</div>`;
+      return;
+    }
+    const total = this.abbeyScores.reduce((a, b) => a + b, 0);
+    let label = '', color = '', action = '';
+    if (total <= 2) { label = 'No Pain'; color = 'var(--pri-green)'; action = 'Continue monitoring. Document score.'; }
+    else if (total <= 7) { label = 'Mild Pain'; color = 'var(--pri-amber)'; action = 'Non-pharmacological interventions. Review PRN analgesic if prescribed.'; }
+    else if (total <= 13) { label = 'Moderate Pain'; color = 'var(--pri-amber)'; action = 'Administer prescribed PRN analgesic. Re-assess in 30 min. Contact GP if not responding.'; }
+    else { label = 'Severe Pain'; color = 'var(--pri-red)'; action = 'Urgent GP contact. Consider emergency admission if analgesics insufficient.'; }
+
+    result.innerHTML = `
+      <div class="score-number" style="color:${color}">${total}/18</div>
+      <div class="score-label">Abbey Pain Scale Score</div>
+      <div class="score-interpretation" style="color:${color}">${label}</div>
+      <p style="font-size:0.83rem; margin:8px 0 0; color:var(--text-2);">${action}</p>
+    `;
+  },
+
+  resetAbbey() {
+    this.abbeyScores = [null, null, null, null, null, null];
+    document.querySelectorAll('.abbey-option').forEach(btn => btn.classList.remove('selected'));
+    const result = document.getElementById('abbeyResult');
+    if (result) result.innerHTML = '<div class="score-label">Select scores above to calculate</div>';
+  },
+
+  copyAbbeyResult() {
+    const filled = this.abbeyScores.filter(s => s !== null);
+    if (filled.length < 6) { showToast('Complete all 6 items first'); return; }
+    const total = this.abbeyScores.reduce((a, b) => a + b, 0);
+    const labels = ['Absent','Mild','Moderate','Severe'];
+    const items = ['Vocalisation','Facial Expression','Body Language','Behavioural Change','Physiological Change','Physical Changes'];
+    const lines = items.map((item, i) => `${item}: ${this.abbeyScores[i]} (${labels[this.abbeyScores[i]]})`);
+    const text = `Abbey Pain Scale Result\nDate/Time: ${new Date().toLocaleString('en-GB')}\n\n${lines.join('\n')}\n\nTotal Score: ${total}/18`;
+    navigator.clipboard.writeText(text).then(() => showToast('Abbey Pain Scale result copied'));
+  },
+
+  copySBAR(btn) {
+    const card = btn.closest('.sbar-scenario');
+    if (!card) return;
+    const paragraphs = card.querySelectorAll('p');
+    const text = Array.from(paragraphs).map(p => p.textContent.trim()).join('\n\n');
+    navigator.clipboard.writeText(text).then(() => showToast('SBAR script copied to clipboard'));
+  }
+};
+
+/* ============================================================
+   GUIDELINE PULSE — weekly auto-check for NICE/BNF updates
+   ============================================================ */
+const GuidelinePulse = {
+  STORAGE_KEY: 'nhub-pulse',
+  CHECKED_KEY: 'nhub-pulse-checked',
+  SEVEN_DAYS: 7 * 24 * 60 * 60 * 1000,
+
+  async init() {
+    const lastChecked = localStorage.getItem(this.CHECKED_KEY);
+    const cached = localStorage.getItem(this.STORAGE_KEY);
+    const isStale = !lastChecked || (Date.now() - new Date(lastChecked).getTime() > this.SEVEN_DAYS);
+
+    if (cached && !isStale) {
+      try {
+        this.render(JSON.parse(cached));
+        this.renderTimestamp(lastChecked);
+        return;
+      } catch { /* fall through to refresh */ }
+    }
+    await this.refresh(false);
+  },
+
+  async refresh(showFeedback = true) {
+    const grid = document.getElementById('guidelinePulseGrid');
+    if (!grid) return;
+
+    if (showFeedback) {
+      grid.innerHTML = '<div class="pulse-skeleton"></div><div class="pulse-skeleton"></div><div class="pulse-skeleton"></div>';
+    }
+
+    const btn = document.getElementById('refreshPulseBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/guidelines-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) throw new Error('API error');
+      const data = await res.json();
+      const checkedAt = data.checkedAt || new Date().toISOString();
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data.updates || []));
+      localStorage.setItem(this.CHECKED_KEY, checkedAt);
+      this.render(data.updates || []);
+      this.renderTimestamp(checkedAt);
+      if (showFeedback) showToast('Guideline Pulse updated');
+    } catch {
+      // Show cached or fallback
+      const cached = localStorage.getItem(this.STORAGE_KEY);
+      if (cached) {
+        try { this.render(JSON.parse(cached)); }
+        catch { this.renderError(); }
+      } else {
+        this.renderError();
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+      if (window.lucide) lucide.createIcons();
+    }
+  },
+
+  render(updates) {
+    const grid = document.getElementById('guidelinePulseGrid');
+    if (!grid) return;
+    if (!updates || updates.length === 0) { this.renderError(); return; }
+
+    const catColour = {
+      'NICE Guideline': 'var(--brand)',
+      'Drug Safety': 'var(--pri-red)',
+      'CQC/Regulatory': 'var(--pri-amber)',
+      'NHS Guidance': 'var(--accent)'
+    };
+    const priColour = { 'High': 'red', 'Medium': 'amber', 'Low': 'blue' };
+
+    grid.innerHTML = updates.slice(0, 6).map(u => `
+      <div class="pulse-card">
+        <div class="pulse-badge"><span class="badge ${priColour[u.priority] || 'blue'}">${u.priority || 'Info'}</span></div>
+        <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:${catColour[u.category] || 'var(--brand)'}; margin-bottom:4px;">${u.category || 'Update'}</div>
+        <strong style="font-size:0.88rem; display:block; margin-bottom:6px;">${u.title}</strong>
+        <p style="font-size:0.82rem; color:var(--text-2); margin:0 0 8px; line-height:1.5;">${u.body}</p>
+        <span style="font-size:0.72rem; color:var(--text-3); font-weight:600;">${u.source || ''}</span>
+      </div>
+    `).join('');
+    if (window.lucide) lucide.createIcons();
+  },
+
+  renderError() {
+    const grid = document.getElementById('guidelinePulseGrid');
+    if (grid) grid.innerHTML = `
+      <div style="grid-column: 1/-1; padding: 20px; text-align:center; color:var(--text-3); font-size:0.88rem; border:1px dashed var(--border); border-radius:var(--radius-sm);">
+        Unable to fetch guideline updates — check your connection or try refreshing.
+      </div>`;
+  },
+
+  renderTimestamp(checkedAt) {
+    const el = document.getElementById('pulseCheckedAt');
+    if (!el || !checkedAt) return;
+    const d = new Date(checkedAt);
+    el.textContent = `Last checked: ${d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})} at ${d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
+  }
+};
+
+/* ============================================================
    INITIALIZATION
    ============================================================ */
 window.addEventListener('DOMContentLoaded', () => {
   App.init();
   Chat.init();
+  Bookmarks.init();
+  GuidelinePulse.init();
   if (window.lucide) {
     lucide.createIcons();
   }
