@@ -6202,10 +6202,7 @@ const Chat = {
           </div>
         `;
       } else {
-        // Render bot message with clipping logic
-        const wordCount = msg.text.split(/\s+/).length;
-        const needsClipping = wordCount > 600 && !msg.showFull;
-        const displayHTML = this.parseMarkdown(needsClipping ? this.clipText(msg.text, 400) : msg.text);
+        const displayHTML = this.parseMarkdown(msg.text);
 
         return `
           <div class="msg-bubble bot">
@@ -6216,11 +6213,6 @@ const Chat = {
             <div style="font-size: 0.88rem; line-height: 1.6; color: var(--text);">
               ${displayHTML}
             </div>
-            ${needsClipping ? `
-              <button class="btn btn-secondary btn-sm" onclick="Chat.expandMessage(${index}, '${target}')" style="margin-top: 8px;">
-                Show full response
-              </button>
-            ` : ''}
             
             <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
               <button class="btn btn-secondary btn-sm" onclick="Chat.copyResponse(${index})" title="Copy to clipboard">
