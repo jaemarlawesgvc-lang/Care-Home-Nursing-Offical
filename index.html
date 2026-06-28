@@ -480,11 +480,11 @@ main.main-content {
 .ai-999-head { color: var(--pri-red); }
 .ai-check {
   display: flex; align-items: flex-start; gap: 8px;
-  padding: 4px 0; font-size: 0.87rem; color: var(--text);
-  line-height: 1.5;
+  padding: 5px 0; font-size: 0.87rem; color: var(--text);
+  line-height: 1.5; border-bottom: 1px solid var(--border);
 }
-.ai-check::before { flex-shrink: 0; margin-top: 1px; }
-.ai-check-done { color: var(--brand); text-decoration: line-through; opacity: 0.7; }
+.ai-check:last-of-type { border-bottom: none; }
+.ai-check-done { color: var(--brand); opacity: 0.6; }
 
 /* ============================================================
    ACCORDIONS
@@ -6469,8 +6469,8 @@ Keep total response under 500 words unless the topic genuinely requires more. Be
     html = html.replace(/^(?:---|___)$/gm, '<hr style="border: 0; border-top: 1px solid var(--border); margin: 12px 0;">');
 
     // Checklist items - [ ] and - [x]
-    html = html.replace(/^- \[x\]\s+(.+)$/gim, '<div class="ai-check ai-check-done">&#10003; $1</div>');
-    html = html.replace(/^- \[ \]\s+(.+)$/gim, '<div class="ai-check">&#9711; $1</div>');
+    html = html.replace(/^- \[x\]\s+(.+)$/gim, '<div class="ai-check ai-check-done">&#9745; $1</div>');
+    html = html.replace(/^- \[ \]\s+(.+)$/gim, '<div class="ai-check">&#9744; $1</div>');
 
     // Headings — h1 is the response title, ## onward are sections
     html = html.replace(/^#\s+(?!#)(.+)$/gm, '<h2 class="ai-response-title">$1</h2>');
@@ -6563,7 +6563,7 @@ Keep total response under 500 words unless the topic genuinely requires more. Be
         
         if (line === "") {
           lines[i] = closeTags;
-        } else if (line.startsWith('<h3') || line.startsWith('<h4') || line.startsWith('<hr') || line.startsWith('<table') || line.startsWith('<thead') || line.startsWith('<tbody')) {
+        } else if (line.startsWith('<h3') || line.startsWith('<h4') || line.startsWith('<hr') || line.startsWith('<div') || line.startsWith('<table') || line.startsWith('<thead') || line.startsWith('<tbody')) {
           lines[i] = closeTags + line;
         } else {
           lines[i] = closeTags + '<p style="margin: 6px 0;">' + line + '</p>';
