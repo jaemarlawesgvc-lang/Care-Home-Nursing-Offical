@@ -443,6 +443,33 @@ main.main-content {
   color: var(--text);
   font-size: 0.88rem;
 }
+/* AI chat response heading styles */
+.ai-section-head {
+  margin-top: 16px; margin-bottom: 8px;
+  font-size: 1rem; font-weight: 700;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  color: var(--brand-strong);
+  background: var(--surface-2);
+  border-left: 3px solid var(--brand);
+}
+.ai-summary-head {
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  border-left-color: var(--brand);
+}
+.ai-redflag-head {
+  color: var(--pri-red);
+  background: var(--pri-red-bg);
+  border-left-color: var(--pri-red);
+}
+.ai-sub-head {
+  font-size: 0.9rem; font-weight: 700;
+  margin-top: 10px; margin-bottom: 4px;
+  color: var(--text-2);
+}
+.ai-999-head {
+  color: var(--pri-red);
+}
 
 /* ============================================================
    ACCORDIONS
@@ -6281,15 +6308,15 @@ const Chat = {
 
 CORE RULES — follow every time:
 1. Base all clinical advice on current UK guidelines: NICE guidelines (cite the specific guideline number e.g. NICE NG185), the BNF (cite the section), MHRA drug safety updates, NHS England guidance, and CQC fundamental standards.
-2. Respond in plain, shift-ready English. Structure with ## headings and bullet points.
-3. Always open with a '📋 Clinical Summary' section (3 bullets max — the single most important things a nurse needs to know RIGHT NOW).
-4. Always close with a '🚨 Red Flags & Escalation' section listing specific triggers for 999 / GP / pharmacist contact.
+2. Respond in plain, shift-ready English. Use ## for section headings and - for bullet points (never use * for bullets).
+3. Always open with the heading "## 📋 Clinical Summary" followed by exactly 3 short bullet points — the most critical things a nurse needs to know right now. Keep each bullet under 25 words.
+4. Always close with the heading "## 🚨 Red Flags & Escalation". Under it use two sub-headings: "### Call 999 immediately" and "### Contact GP or pharmacist" each with clear, specific bullet triggers.
 5. When citing drug doses or interactions, say "per BNF [section]" or "per NICE [guideline]" and always recommend the nurse verify against the resident's prescription and the current BNF before acting.
 6. Never give specific prescribing advice — that is for the GP/prescriber. You advise on nursing observation, monitoring, administration, and when to escalate.
 7. Flag if any guidance you provide may have been updated recently — care home guidelines evolve frequently.
 8. For safeguarding concerns, always cite Care Act 2014 s.42 and advise reporting to Local Authority Safeguarding Adults team.
 9. For controlled drugs, reference Misuse of Drugs Regulations 2001 and CQC CD guidance.
-10. Keep total response under 400 words unless the question genuinely requires more detail.`;
+10. Keep total response under 450 words. Be specific and concise — no waffle.`;
     const fullPrompt = SYSTEM_PROMPT + "\n\nQuestion: " + text;
 
     try {
@@ -6346,9 +6373,10 @@ CORE RULES — follow every time:
     // Escape HTML first
     let html = this.escapeHTML(markdown);
 
-    // Bold & Italic
+    // Bold (must run before italic)
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Italic — only match *word* where * is NOT followed by a space (avoids eating bullet markers like "* item")
+    html = html.replace(/\*([^\s*][^*\n]*?)\*/g, '<em>$1</em>');
 
     // Inline Code
     html = html.replace(/`(.*?)`/g, '<code>$1</code>');
@@ -6356,9 +6384,12 @@ CORE RULES — follow every time:
     // Dividers (--- or ___)
     html = html.replace(/^(?:---|___)$/gm, '<hr style="border: 0; border-top: 1px solid var(--border); margin: 12px 0;">');
 
-    // Headings
-    html = html.replace(/^##\s+(.+)$/gm, '<h3 style="margin-top: 14px; margin-bottom: 8px; color: var(--brand-strong); font-size: 1.05rem; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 4px;">$1</h3>');
-    html = html.replace(/^###\s+(.+)$/gm, '<h4 style="margin-top: 12px; margin-bottom: 6px; color: var(--accent); font-size: 0.95rem; font-weight: 700;">$1</h4>');
+    // Headings — special styling for Clinical Summary and Red Flags sections
+    html = html.replace(/^##\s+(📋.+)$/gm, '<h3 class="ai-section-head ai-summary-head">$1</h3>');
+    html = html.replace(/^##\s+(🚨.+)$/gm, '<h3 class="ai-section-head ai-redflag-head">$1</h3>');
+    html = html.replace(/^##\s+(.+)$/gm, '<h3 class="ai-section-head">$1</h3>');
+    html = html.replace(/^###\s+(Call 999.+)$/gm, '<h4 class="ai-sub-head ai-999-head">$1</h4>');
+    html = html.replace(/^###\s+(.+)$/gm, '<h4 class="ai-sub-head">$1</h4>');
 
     // Parse tables
     let lines = html.split('\n');
@@ -6414,9 +6445,10 @@ CORE RULES — follow every time:
         continue;
       }
 
-      // Bullet items
-      if (line.startsWith('- ') || line.startsWith('* ')) {
-        let content = line.substring(2);
+      // Bullet items (handle -, *, and variants with multiple trailing spaces like "*   text")
+      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+      if (bulletMatch) {
+        let content = bulletMatch[1];
         if (!inList) {
           lines[i] = '<ul style="margin: 6px 0; padding-left: 20px; line-height: 1.6;"><li>' + content + '</li>';
           inList = true;
@@ -6464,36 +6496,51 @@ CORE RULES — follow every time:
     let wrapper = document.createElement('div');
     wrapper.innerHTML = html;
 
-    const redFlagKeywords = ["red flag", "when to escalate", "escalate immediately"];
-    const cautionKeywords = ["caution", "warning", "monitor closely"];
-
-    // Stylize paragraphs
-    wrapper.querySelectorAll('p').forEach(p => {
-      let text = p.textContent.toLowerCase();
-      if (redFlagKeywords.some(kw => text.includes(kw))) {
-        p.className = 'warning-box';
-      } else if (cautionKeywords.some(kw => text.includes(kw))) {
-        p.className = 'caution-box';
+    // Wrap content after 🚨 heading in a red-tinted box
+    wrapper.querySelectorAll('h3.ai-redflag-head').forEach(h3 => {
+      const box = document.createElement('div');
+      box.style.cssText = 'background: var(--pri-red-bg); border: 1px solid rgba(var(--pri-red-rgb, 220,38,38),0.2); border-radius: var(--radius-sm); padding: 4px 12px 10px; margin-top: 4px;';
+      let sibling = h3.nextSibling;
+      const collected = [];
+      while (sibling) {
+        const next = sibling.nextSibling;
+        if (sibling.nodeType === 1 && (sibling.tagName === 'H3' || sibling.tagName === 'H4' && sibling.classList.contains('ai-section-head'))) break;
+        collected.push(sibling);
+        sibling = next;
       }
+      collected.forEach(n => box.appendChild(n));
+      h3.after(box);
     });
 
-    // Stylize list items containing keywords
-    wrapper.querySelectorAll('li').forEach(li => {
-      let text = li.textContent.toLowerCase();
-      if (redFlagKeywords.some(kw => text.includes(kw))) {
-        li.style.borderLeft = '3px solid var(--pri-red)';
-        li.style.paddingLeft = '8px';
-        li.style.color = 'var(--pri-red)';
-        li.style.listStyleType = 'none';
-        li.style.marginTop = '4px';
-        li.style.marginBottom = '4px';
-      } else if (cautionKeywords.some(kw => text.includes(kw))) {
-        li.style.borderLeft = '3px solid var(--pri-amber)';
-        li.style.paddingLeft = '8px';
-        li.style.color = 'var(--pri-amber)';
-        li.style.listStyleType = 'none';
-        li.style.marginTop = '4px';
-        li.style.marginBottom = '4px';
+    // Wrap content after 📋 heading in a teal-tinted box
+    wrapper.querySelectorAll('h3.ai-summary-head').forEach(h3 => {
+      const box = document.createElement('div');
+      box.style.cssText = 'background: var(--brand-soft); border-radius: var(--radius-sm); padding: 4px 12px 10px; margin-top: 4px;';
+      let sibling = h3.nextSibling;
+      const collected = [];
+      while (sibling) {
+        const next = sibling.nextSibling;
+        if (sibling.nodeType === 1 && sibling.tagName === 'H3') break;
+        collected.push(sibling);
+        sibling = next;
+      }
+      collected.forEach(n => box.appendChild(n));
+      h3.after(box);
+    });
+
+    // Colour 999 sub-head list items red
+    wrapper.querySelectorAll('h4.ai-999-head').forEach(h4 => {
+      let sibling = h4.nextSibling;
+      while (sibling) {
+        const next = sibling.nextSibling;
+        if (sibling.nodeType === 1 && (sibling.tagName === 'H3' || sibling.tagName === 'H4')) break;
+        if (sibling.tagName === 'UL') {
+          sibling.querySelectorAll('li').forEach(li => {
+            li.style.color = 'var(--pri-red)';
+            li.style.fontWeight = '600';
+          });
+        }
+        sibling = next;
       }
     });
 
